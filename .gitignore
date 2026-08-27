@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+dist/
+.next/
+.vinext/
+.wrangler/
+coverage/
+*.log
+*.backup
+.DS_Store

@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("../config/env");
 
 const pool = require("../config/db");
 const tmdb = require("../services/tmdb.service");

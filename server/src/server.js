@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./config/env");
 
 const app = require("./app");
 const pool = require("./config/db");

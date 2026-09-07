@@ -10,3 +10,6 @@ coverage/
 *.log
 *.backup
 .DS_Store
+.local-data/
+*.tsbuildinfo
+frontend/worker-configuration.d.ts

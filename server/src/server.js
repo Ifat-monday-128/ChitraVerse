@@ -4,7 +4,13 @@ const app = require("./app");
 const pool = require("./config/db");
 
 const port = Number(process.env.PORT || 5000);
-const server = app.listen(port, () => {
+const server = app.listen(port, (error) => {
+  if (error) {
+    console.error(`Could not start the API on port ${port}: ${error.message}`);
+    pool.end();
+    process.exitCode = 1;
+    return;
+  }
   console.log(`ChitraVerse API running at http://localhost:${port}`);
 });
 

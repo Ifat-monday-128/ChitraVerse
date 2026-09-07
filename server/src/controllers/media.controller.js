@@ -2,19 +2,29 @@ const mediaService = require("../services/media.service");
 
 exports.getHome = async (req, res, next) => {
   try {
-    const requestedLimit = Number.parseInt(req.query.limit || "20", 10);
-    const limit = Number.isInteger(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), 100)
-      : 20;
-    res.json(await mediaService.getHome(limit));
+    res.json(await mediaService.getHome());
   } catch (error) {
     next(error);
   }
 };
 
+exports.browse = async (req, res, next) => {
+  try {
+    const { type = "all", collection = "all", q = "" } = req.query;
+    const limit = Number(req.query.limit ?? 24);
+    const offset = Number(req.query.offset ?? 0);
+    if (!["all", "movie", "series"].includes(type) || !["all", "hollywood"].includes(collection)
+      || typeof q !== "string" || q.length > 120 || !Number.isInteger(limit) || limit < 1 || limit > 100
+      || !Number.isInteger(offset) || offset < 0 || offset > 100000) {
+      return res.status(400).json({ error: "Invalid search or pagination parameters" });
+    }
+    res.json(await mediaService.browse({ type, collection, q: q.trim(), limit, offset }));
+  } catch (error) { next(error); }
+};
+
 exports.getDetails = async (req, res, next) => {
   try {
-    const titleId = Number.parseInt(req.params.titleId, 10);
+    const titleId = Number(req.params.titleId);
     if (!Number.isInteger(titleId) || titleId < 1) {
       return res.status(400).json({ error: "Invalid title ID" });
     }
@@ -29,9 +39,9 @@ exports.getDetails = async (req, res, next) => {
 
 exports.getEpisodes = async (req, res, next) => {
   try {
-    const titleId = Number.parseInt(req.params.titleId, 10);
-    const seasonNumber = Number.parseInt(req.params.seasonNumber, 10);
-    if (!Number.isInteger(titleId) || !Number.isInteger(seasonNumber)) {
+    const titleId = Number(req.params.titleId);
+    const seasonNumber = Number(req.params.seasonNumber);
+    if (!Number.isInteger(titleId) || titleId < 1 || !Number.isInteger(seasonNumber) || seasonNumber < 0) {
       return res.status(400).json({ error: "Invalid title ID or season number" });
     }
 

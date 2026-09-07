@@ -1,29 +1,69 @@
 const pool = require("../config/db");
 
-exports.getHome = async (limit = 20) => {
-  const result = await pool.query(
-    `SELECT
-       m.title_id,
-       m.tmdb_id,
-       m.title,
-       m.poster,
-       m.tmdb_rating,
-       ratings.chitraverse_rating,
-       ratings.chitraverse_vote_count,
-       CASE
-         WHEN mo.title_id IS NOT NULL THEN 'movie'
-         WHEN s.title_id IS NOT NULL THEN 'series'
-       END AS media_type
-     FROM media m
-     LEFT JOIN movie mo ON mo.title_id = m.title_id
-     LEFT JOIN series s ON s.title_id = m.title_id
-     LEFT JOIN media_rating_summary ratings ON ratings.title_id = m.title_id
-     ORDER BY m.tmdb_rating DESC NULLS LAST
-     LIMIT $1`,
-    [limit],
-  );
+const columns = `m.title_id, m.title, m.description, m.language, m.poster,
+  m.tmdb_rating, m.trailer_link, mo.runtime,
+  COALESCE(mo.release_date, s.first_air_date) AS release_date,
+  CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'series' END AS media_type`;
+const joins = `FROM media m LEFT JOIN movie mo USING(title_id) LEFT JOIN series s USING(title_id)`;
+const hollywood = `mo.title_id IS NOT NULL AND m.language = 'en' AND EXISTS (
+  SELECT 1 FROM media_company mc JOIN production_house ph USING(company_id)
+  WHERE mc.title_id = m.title_id AND ph.country = 'US')`;
+const vector = `(setweight(to_tsvector('simple', coalesce(m.title, '')), 'A') ||
+  setweight(to_tsvector('simple', coalesce(m.description, '')), 'D'))`;
+const escapeLike = (value) => value.replace(/[\\%_]/g, "\\$&");
 
-  return result.rows;
+exports.getHome = async () => {
+  const { rows } = await pool.query(`SELECT ${columns} ${joins}
+    WHERE ${hollywood}
+    ORDER BY (m.poster IS NOT NULL AND m.trailer_link IS NOT NULL) DESC,
+      m.tmdb_rating DESC NULLS LAST, m.title_id LIMIT 13`);
+  const featured = rows.length ? await exports.getDetails(rows[0].title_id) : null;
+  return { featured, items: rows.slice(1) };
+};
+
+exports.browse = async ({ type, collection, limit, offset, q = "" }) => {
+  const values = [];
+  const bind = (value) => { values.push(value); return `$${values.length}`; };
+  const conditions = ["(mo.title_id IS NOT NULL OR s.title_id IS NOT NULL)"];
+  if (type === "movie") conditions.push("mo.title_id IS NOT NULL");
+  if (type === "series") conditions.push("s.title_id IS NOT NULL");
+  if (collection === "hollywood") conditions.push(hollywood);
+  let score = "0";
+  let searchJoins = "";
+  if (q) {
+    const query = bind(q.toLowerCase());
+    const prefix = bind(`${escapeLike(q.toLowerCase())}%`);
+    const contains = bind(`%${escapeLike(q.toLowerCase())}%`);
+    const tsquery = `websearch_to_tsquery('simple', ${query})`;
+    // Rank exact titles above prefixes, title text matches, cast names and synopsis.
+    searchJoins = `LEFT JOIN (
+      SELECT credits.title_id, MAX(CASE WHEN lower(c.name) = ${query} THEN 1.0
+        WHEN lower(c.name) LIKE ${contains} THEN 0.8
+        ELSE similarity(lower(c.name), ${query}) END) AS rank
+      FROM media_cast_crew credits JOIN cast_crew c USING(cast_crew_id)
+      JOIN role r USING(role_id)
+      WHERE r.role_name = 'Actor'
+        AND (lower(c.name) LIKE ${contains} OR (length(${query}) >= 3 AND lower(c.name) % ${query}))
+      GROUP BY credits.title_id
+    ) actor ON actor.title_id = m.title_id`;
+    const titleMatch = `to_tsvector('simple', coalesce(m.title, '')) @@ ${tsquery}`;
+    conditions.push(`(lower(m.title) LIKE ${contains} OR ${vector} @@ ${tsquery}
+      OR (length(${query}) >= 3 AND lower(m.title) % ${query}) OR actor.rank IS NOT NULL)`);
+    score = `(CASE WHEN lower(m.title) = ${query} THEN 1000 ELSE 0 END
+      + CASE WHEN lower(m.title) LIKE ${prefix} THEN 500 ELSE 0 END
+      + CASE WHEN ${titleMatch} THEN 200 ELSE 0 END
+      + CASE WHEN lower(m.title) LIKE ${contains} THEN 100 ELSE 0 END
+      + coalesce(actor.rank, 0) * 70 + similarity(lower(m.title), ${query}) * 50
+      + ts_rank_cd(${vector}, ${tsquery}) * 20)`;
+  }
+  const source = `${joins} ${searchJoins} WHERE ${conditions.join(" AND ")}`;
+  const { rows: count } = await pool.query(`SELECT COUNT(*)::int AS total FROM (SELECT ${score} AS relevance ${source}) matches`, values);
+  const limitParam = bind(limit);
+  const offsetParam = bind(offset);
+  const { rows } = await pool.query(`SELECT ${columns}, ${score} AS relevance ${source}
+    ORDER BY relevance DESC, m.tmdb_rating DESC NULLS LAST, m.title_id
+    LIMIT ${limitParam} OFFSET ${offsetParam}`, values);
+  return { items: rows, total: count[0].total, hasMore: offset + rows.length < count[0].total, query: q };
 };
 
 exports.getDetails = async (titleId) => {

@@ -7,12 +7,6 @@ const delay = (milliseconds) => new Promise((resolve) => {
   setTimeout(resolve, milliseconds);
 });
 
-function trailerKey(videos = []) {
-  return videos.find(
-    (video) => video.site === "YouTube" && video.type === "Trailer",
-  )?.key || null;
-}
-
 async function linkPerson(titleId, person, roleType) {
   const result = await pool.query(
     `INSERT INTO cast_crew (tmdb_id, name, photo)
@@ -83,14 +77,14 @@ async function linkCastAndCompanies(titleId, credits = {}, companies = []) {
 
 async function enrichMovie(titleId, tmdbId) {
   const { data } = await tmdb.get(`/movie/${tmdbId}`, {
-    params: { append_to_response: "credits,videos" },
+    params: { append_to_response: "credits" },
   });
 
   await pool.query(
     `UPDATE media
-     SET budget = $1, trailer_link = $2
-     WHERE title_id = $3`,
-    [data.budget || null, trailerKey(data.videos?.results), titleId],
+     SET budget = $1
+     WHERE title_id = $2`,
+    [data.budget || null, titleId],
   );
   await pool.query(
     `UPDATE movie
@@ -140,13 +134,9 @@ async function upsertSeasonAndEpisodes(titleId, tmdbId, seasonSummary) {
 
 async function enrichTV(titleId, tmdbId) {
   const { data } = await tmdb.get(`/tv/${tmdbId}`, {
-    params: { append_to_response: "credits,videos" },
+    params: { append_to_response: "credits" },
   });
 
-  await pool.query(
-    `UPDATE media SET trailer_link = $1 WHERE title_id = $2`,
-    [trailerKey(data.videos?.results), titleId],
-  );
   await pool.query(
     `UPDATE series
      SET status = $1, last_air_date = $2

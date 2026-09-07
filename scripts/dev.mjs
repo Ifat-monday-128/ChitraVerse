@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const services = [
-  { name: "API", directory: "server", cli: "nodemon/bin/nodemon.js", args: ["src/server.js"] },
+  { name: "API", directory: "server", cli: "pg/package.json", args: ["--watch", "src/server.js"] },
   { name: "Frontend", directory: "frontend", cli: "vinext/dist/cli.js", args: ["dev", "--config", "vite.config.ts"] },
 ];
 
@@ -41,7 +41,7 @@ process.on("SIGINT", () => stop());
 process.on("SIGTERM", () => stop());
 
 for (const service of services) {
-  const child = spawn(process.execPath, [service.entry, ...service.args], {
+  const child = spawn(process.execPath, service.name === "API" ? service.args : [service.entry, ...service.args], {
     cwd: resolve(root, service.directory),
     stdio: "inherit",
     detached: process.platform !== "win32",

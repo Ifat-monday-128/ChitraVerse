@@ -18,7 +18,10 @@ exports.browse = async (req, res, next) => {
       || !Number.isInteger(offset) || offset < 0 || offset > 100000) {
       return res.status(400).json({ error: "Invalid search or pagination parameters" });
     }
-    res.json(await mediaService.browse({ type, collection, q: q.trim(), limit, offset }));
+    let filters;
+    try { filters = require('../utils/searchFilters').parseFilters(req.query); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    res.json(await mediaService.browse({ type, collection, q: q.trim(), limit, offset, ...filters, watchlistUser: req.watchlistUser }));
   } catch (error) { next(error); }
 };
 

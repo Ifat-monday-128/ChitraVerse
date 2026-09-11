@@ -17,17 +17,21 @@ exports.getHome = async () => {
     WHERE ${hollywood}
     ORDER BY (m.poster IS NOT NULL AND m.trailer_link IS NOT NULL) DESC,
       m.tmdb_rating DESC NULLS LAST, m.title_id LIMIT 13`);
-  const featured = rows.length ? await exports.getDetails(rows[0].title_id) : null;
-  return { featured, items: rows.slice(1) };
+  const chosen = await pool.query('SELECT title_id FROM homepage_feature ORDER BY position');
+  const featuredItems = (await Promise.all((chosen.rows.length ? chosen.rows : rows.slice(0, 1)).map(item => exports.getDetails(item.title_id)))).filter(Boolean);
+  return { featured: featuredItems[0] || null, featuredItems, items: rows.slice(1) };
 };
 
-exports.browse = async ({ type, collection, limit, offset, q = "" }) => {
+exports.browse = async ({ type, collection, limit, offset, q = "", companyId, watchlistUser, ...filters }) => {
   const values = [];
   const bind = (value) => { values.push(value); return `$${values.length}`; };
   const conditions = ["(mo.title_id IS NOT NULL OR s.title_id IS NOT NULL)"];
   if (type === "movie") conditions.push("mo.title_id IS NOT NULL");
   if (type === "series") conditions.push("s.title_id IS NOT NULL");
   if (collection === "hollywood") conditions.push(hollywood);
+  conditions.push(...require('../utils/searchFilters').conditions(filters, bind));
+  if (companyId) conditions.push(`EXISTS(SELECT 1 FROM media_company mc WHERE mc.title_id=m.title_id AND mc.company_id=${bind(companyId)})`);
+  if (watchlistUser) conditions.push(`EXISTS(SELECT 1 FROM watchlist_item wi JOIN watchlist w USING(watchlist_id) WHERE wi.title_id=m.title_id AND w.user_id=${bind(watchlistUser)})`);
   let score = "0";
   let searchJoins = "";
   if (q) {
@@ -61,7 +65,7 @@ exports.browse = async ({ type, collection, limit, offset, q = "" }) => {
   const limitParam = bind(limit);
   const offsetParam = bind(offset);
   const { rows } = await pool.query(`SELECT ${columns}, ${score} AS relevance ${source}
-    ORDER BY relevance DESC, m.tmdb_rating DESC NULLS LAST, m.title_id
+    ORDER BY ${require('../utils/searchFilters').order(filters.sort)}, m.title_id
     LIMIT ${limitParam} OFFSET ${offsetParam}`, values);
   return { items: rows, total: count[0].total, hasMore: offset + rows.length < count[0].total, query: q };
 };

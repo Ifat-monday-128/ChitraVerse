@@ -2,6 +2,7 @@ const express = require("express");
 const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
 const pool = require("../config/db");
+const { createJwt, verifyJwt, lifetimeSeconds } = require("../utils/jwt");
 const scrypt = promisify(scryptCallback);
 const router = express.Router();
 const cookieName = "chitraverse_session";
@@ -11,7 +12,7 @@ const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 // Keep cookie parsing in one place for both authentication and logout.
 function sessionToken(req) {
   const token = (req.headers.cookie || "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
-  return token && /^[a-f0-9]{64}$/.test(token) ? token : null;
+  return token && token.length <= 4096 ? token : null;
 }
 
 function publicUser(user) {
@@ -21,20 +22,23 @@ function publicUser(user) {
 async function currentUser(req) {
   const token = sessionToken(req);
   if (!token) return null;
+  const claims = verifyJwt(token);
+  if (!claims) return null;
   const { rows } = await pool.query(`SELECT u.user_id, u.name, u.email, u.role FROM users u
-    JOIN user_session s USING(user_id) WHERE s.token_hash=$1 AND s.expires_at > now()`, [hashToken(token)]);
+    JOIN user_session s USING(user_id)
+    WHERE s.token_hash=$1 AND s.expires_at > now() AND u.user_id=$2`, [hashToken(token), Number(claims.sub)]);
   return rows[0] || null;
 }
 
 async function createSession(req, res, user) {
-  const token = randomBytes(32).toString("hex");
+  const { token, expiresAt } = createJwt(user.user_id);
   const previousToken = sessionToken(req);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     // Replace this browser's old session when signing in to another account.
     await client.query("DELETE FROM user_session WHERE expires_at <= now() OR token_hash=$1", [previousToken ? hashToken(previousToken) : null]);
-    await client.query("INSERT INTO user_session(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '7 days')", [hashToken(token), user.user_id]);
+    await client.query("INSERT INTO user_session(token_hash,user_id,expires_at) VALUES($1,$2,$3)", [hashToken(token), user.user_id, expiresAt]);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -42,7 +46,7 @@ async function createSession(req, res, user) {
   } finally {
     client.release();
   }
-  res.cookie(cookieName, token, { ...cookieOptions, maxAge: 7 * 86400000 });
+  res.cookie(cookieName, token, { ...cookieOptions, maxAge: lifetimeSeconds * 1000 });
   return res.json({ user: publicUser(user) });
 }
 
@@ -126,6 +130,32 @@ router.get("/admin/users", async (req, res) => {
     FROM users u ORDER BY u.created_at DESC,u.user_id DESC`);
   res.json({ users: rows });
 });
+router.get('/admin/homepage', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
+  const { rows } = await pool.query(`SELECT m.title_id,m.title,m.poster,
+    CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'series' END AS media_type
+    FROM homepage_feature f JOIN media m USING(title_id) LEFT JOIN movie mo USING(title_id) ORDER BY f.position`);
+  res.json({ items: rows });
+});
+router.put('/admin/homepage', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
+  const ids = req.body?.title_ids;
+  if (!Array.isArray(ids) || ids.length > 20 || ids.some(id => !Number.isInteger(id) || id < 1 || id > 2147483647) || new Set(ids).size !== ids.length) {
+    return res.status(400).json({ error: 'Choose up to 20 distinct movie or series titles.' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('LOCK TABLE homepage_feature IN EXCLUSIVE MODE');
+    const valid = await client.query(`SELECT m.title_id FROM media m WHERE m.title_id=ANY($1::int[])
+      AND (EXISTS(SELECT 1 FROM movie WHERE title_id=m.title_id) OR EXISTS(SELECT 1 FROM series WHERE title_id=m.title_id)) FOR KEY SHARE`, [ids]);
+    if (valid.rowCount !== ids.length) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'One or more selected titles no longer exist.' }); }
+    await client.query('DELETE FROM homepage_feature');
+    await client.query('INSERT INTO homepage_feature(title_id,position) SELECT id,ordinality-1 FROM unnest($1::int[]) WITH ORDINALITY AS entries(id,ordinality)', [ids]);
+    await client.query('COMMIT'); res.json({ saved: true });
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+});
 router.get("/ratings/:titleId", async (req, res) => {
   if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate movies." });
   const titleId = Number(req.params.titleId);
@@ -162,6 +192,10 @@ router.put("/ratings/:titleId", async (req, res) => {
 router.use("/watchlist", (req, res, next) => {
   if (req.user.role === "admin") return res.status(403).json({ error: "Admins cannot use watchlists." });
   next();
+});
+router.get('/watchlist/search', (req, res, next) => {
+  req.watchlistUser = req.user.user_id;
+  return require('../controllers/media.controller').browse(req, res, next);
 });
 router.get("/watchlist", async (req, res) => {
   const { rows } = await pool.query(`SELECT DISTINCT m.title_id, m.title, m.poster, m.tmdb_rating,

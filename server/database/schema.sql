@@ -20,6 +20,11 @@ budget BIGINT,
 trailer_link TEXT
 );
 
+CREATE TABLE homepage_feature (
+title_id INT PRIMARY KEY REFERENCES media(title_id) ON DELETE CASCADE,
+position INT NOT NULL UNIQUE CHECK(position >= 0)
+);
+
 CREATE TABLE movie (
 title_id INT PRIMARY KEY,
 runtime INT,

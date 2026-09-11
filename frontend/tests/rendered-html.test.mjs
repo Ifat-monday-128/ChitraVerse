@@ -17,7 +17,7 @@ test("built homepage renders without fabricated movie data or artwork", async ()
   assert.match(html, /Hollywood movies/);
   assert.match(html, /Loading your movie library/);
   assert.doesNotMatch(html, /Interstellar|Breaking Bad|Stranger Things|interstellar-hero|13\+/);
-  assert.match(html, /aria-label="Search"/);
+  assert.match(html, /aria-label="Search the library"/);
   assert.match(html, /aria-label="Open profile"/);
   const assets = await readdir(new URL("../dist/client/", import.meta.url));
   assert.ok(!assets.includes("interstellar-hero.jpg"));

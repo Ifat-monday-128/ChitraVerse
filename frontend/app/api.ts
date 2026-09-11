@@ -4,11 +4,18 @@ export type Media = {
   tmdb_rating: string | null; media_type: "movie" | "series"; runtime?: number | null;
   release_date?: string | null; first_air_date?: string | null; language?: string; trailer_link?: string | null;
   genres?: { name: string }[];
-  cast_crew?: { cast_crew_id: number; name: string; role_type: string }[];
-  production_companies?: { company_id: number; name: string; country: string }[];
+  cast_crew?: { cast_crew_id: number; name: string; photo: string | null; role_type: string }[];
+  production_companies?: Company[];
   seasons?: { season_id: number; season_number: number; total_episode: number }[];
 };
 export type User = { user_id: number; name: string; email: string; role: string | null };
+export type Company = { company_id: number; name: string; country: string | null; logo: string | null };
+export type Person = {
+  cast_crew_id: number; name: string; photo: string | null; biography: string | null;
+  date_of_birth: string | null; deathday: string | null; age: number | null;
+  place_of_birth: string | null; profile_source: "library";
+  filmography: (Media & { tmdb_id: number | null; roles: string[] })[];
+};
 export type Results = { items: Media[]; total: number; hasMore: boolean };
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -38,4 +45,10 @@ export function trailerUrl(value?: string | null) {
   if (/^watch\?v=[A-Za-z0-9_-]{11}$/.test(value)) return `https://www.youtube.com/${value}`;
   if (/^[A-Za-z0-9_-]{11}$/.test(value)) return `https://www.youtube.com/watch?v=${value}`;
   return undefined;
+}
+export function trailerEmbedUrl(value?: string | null) {
+  const url = trailerUrl(value);
+  if (!url) return undefined;
+  const id = new URL(url).searchParams.get("v");
+  return id ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1` : undefined;
 }

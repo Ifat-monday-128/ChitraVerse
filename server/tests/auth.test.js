@@ -83,6 +83,22 @@ test("each database role can log in then log out; replaying the old cookie fails
     assert.equal((await request("/api/account/me", { cookie })).body.user.role, role);
 
     const token = cookie.split("=")[1];
+    const [header, payload, signature] = token.split(".");
+    assert.deepEqual(JSON.parse(Buffer.from(header, "base64url")), { alg: "HS256", typ: "JWT" });
+    const claims = JSON.parse(Buffer.from(payload, "base64url"));
+    assert.equal(claims.sub, String(login.body.user.user_id));
+    assert.equal(claims.iss, "chitraverse-api");
+    assert.equal(claims.aud, "chitraverse-web");
+    assert.equal(claims.role, undefined);
+    assert.ok(signature);
+    const forgedPayload = Buffer.from(JSON.stringify({ ...claims, sub: "999999", role: "admin" })).toString("base64url");
+    const tamperedCookies = [
+      `chitraverse_session=${header}.${forgedPayload}.${signature}`,
+      `chitraverse_session=${header}.${payload}.${signature.slice(0, -1)}${signature.endsWith("A") ? "B" : "A"}`,
+    ];
+    for (const tamperedCookie of tamperedCookies) {
+      assert.equal((await request("/api/account/me", { cookie: tamperedCookie })).status, 401);
+    }
     const hash = createHash("sha256").update(token).digest("hex");
     assert.equal((await pool.query("SELECT 1 FROM user_session WHERE token_hash=$1", [hash])).rowCount, 1);
     assert.equal((await pool.query("SELECT 1 FROM user_session WHERE token_hash=$1", [token])).rowCount, 0);

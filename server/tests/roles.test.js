@@ -97,3 +97,58 @@ test("users rate movies once; admin can inspect activity but cannot rate or use 
   assert.equal((await rate(5)).status,401);
 });
 
+test('only authenticated admins can persist and reorder homepage movies and series', async () => {
+  const movie = (await pool.query("INSERT INTO media(title) VALUES('Featured movie') RETURNING title_id")).rows[0].title_id;
+  const series = (await pool.query("INSERT INTO media(title) VALUES('Featured series') RETURNING title_id")).rows[0].title_id;
+  await pool.query('INSERT INTO movie(title_id) VALUES($1)', [movie]);
+  await pool.query('INSERT INTO series(title_id) VALUES($1)', [series]);
+  const login = async role => (await request('/api/account/login', { body: { email: `${role}@example.invalid`, password } })).cookie;
+  const adminCookie = await login('admin'), userCookie = await login('user'), moderatorCookie = await login('moderator');
+  const endpoint = '/api/account/admin/homepage';
+  const save = (ids, cookie = adminCookie) => request(endpoint, { method: 'PUT', cookie, body: { title_ids: ids, role: 'admin' } });
+  assert.equal((await request(endpoint)).status, 401);
+  assert.equal((await save([movie], null)).status, 401);
+  for (const cookie of [userCookie, moderatorCookie]) {
+    assert.equal((await request(endpoint, { cookie })).status, 403);
+    assert.equal((await save([movie], cookie)).status, 403);
+  }
+  assert.equal((await save([movie])).status, 200);
+  assert.deepEqual((await request('/api/media/home')).body.featuredItems.map(item => item.title_id), [movie]);
+  assert.equal((await save([series, movie])).status, 200);
+  assert.deepEqual((await request('/api/media/home')).body.featuredItems.map(item => item.media_type), ['series', 'movie']);
+  assert.deepEqual((await request(endpoint, { cookie: adminCookie })).body.items.map(item => item.title_id), [series, movie]);
+  for (const ids of [null, 'bad', [movie, movie], ['1'], [-1], [2147483647], Array.from({length:21}, (_,index)=>index+1)]) {
+    assert.equal((await save(ids)).status, 400);
+  }
+  assert.deepEqual((await request('/api/media/home')).body.featuredItems.map(item => item.title_id), [series, movie]);
+  // Applying the one-time addition again must preserve an existing lineup.
+  const migration = await fs.readFile(path.resolve(__dirname, '../database/migrations/002_homepage_features.sql'), 'utf8');
+  await pool.query(migration); await pool.query(migration);
+  assert.equal((await request('/api/media/home')).body.featured.title_id, series);
+  assert.equal((await save([movie, series])).status, 200);
+  assert.equal((await request('/api/media/home')).body.featured.title_id, movie);
+  assert.equal((await save([])).status, 200);
+  await request('/api/account/logout', { method: 'POST', cookie: adminCookie });
+  assert.equal((await save([movie])).status, 401);
+});
+
+test('watchlist search filters only the authenticated user’s saved titles', async () => {
+  const login=async role=>(await request('/api/account/login',{body:{email:`${role}@example.invalid`,password}})).cookie;
+  const userCookie=await login('user'), otherCookie=await login('moderator');
+  const ids=[];
+  for(const title of ['Private filter Alpha','Private filter Beta']) {
+    const id=(await pool.query('INSERT INTO media(title,tmdb_rating) VALUES($1,9) RETURNING title_id',[title])).rows[0].title_id;
+    await pool.query("INSERT INTO movie(title_id,release_date,runtime) VALUES($1,'2015-01-01',100)",[id]);ids.push(id);
+  }
+  await request(`/api/account/watchlist/${ids[0]}`,{method:'PUT',cookie:userCookie});
+  await request(`/api/account/watchlist/${ids[1]}`,{method:'PUT',cookie:otherCookie});
+  const url='/api/account/watchlist/search?q=Private%20filter&rating_min=8&year_from=2010&runtime_max=120&sort=title_asc';
+  assert.equal((await request(url)).status,401);
+  const result=await request(url+'&user_id=999',{cookie:userCookie});
+  assert.equal(result.status,200);assert.equal(result.body.total,1);assert.equal(result.body.items[0].title_id,ids[0]);
+  assert.equal((await request(url,{cookie:otherCookie})).body.items[0].title_id,ids[1]);
+  assert.equal((await request('/api/account/watchlist/search?rating_min=11',{cookie:userCookie})).status,400);
+  await request('/api/account/logout',{method:'POST',cookie:userCookie});
+  assert.equal((await request(url,{cookie:userCookie})).status,401);
+});
+

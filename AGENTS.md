@@ -34,7 +34,7 @@
   - denylist/revocation storage,
   - or another secure server-controlled invalidation method.
 - After logout, accessing a protected endpoint must return `401 Unauthorized`.
-- The frontend should clear its local authentication state only after the backend logout succeeds.
+- The frontend should clear its local authentication state only after the backend logout succeeds.`
 
 ## Rules and constraints
 

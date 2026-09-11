@@ -24,7 +24,7 @@ Browser -> TMDB image CDN / stored HTTPS poster URL
 Browser -> YouTube when a trailer is opened
 ```
 
-The browser obtains catalog records through the API. Poster paths and trailer references come from the database, although external providers serve the actual images and videos. Missing data produces loading, empty, unavailable, or error states. There is no sample-film fallback or manufactured Interstellar artwork.
+The browser obtains catalog records through the API. Poster paths and trailer references come from the database, although external providers serve the actual images and videos. Missing data produces loading, empty, unavailable, or error states. There is no sample-film fallback or manufactured Interstellar artwork. Cast profiles, biographies, filmographies, search, and title details use only local database records. Missing profile fields remain unavailable. Legacy TMDB title links resolve only to already imported local titles; they return 404 otherwise. TMDB API access is confined to the explicit import/enrichment scripts.
 
 The frontend uses React 19, Next.js-compatible application conventions, vinext, Vite, and Tailwind CSS. The application database is PostgreSQL. The frontend's optional Drizzle/D1 examples and hosting bindings are starter infrastructure, not the movie or account database.
 
@@ -127,6 +127,7 @@ npm.cmd run dev:frontend
 | `DB_USER` | `server/.env` | PostgreSQL username. |
 | `DB_PASSWORD` | `server/.env` | PostgreSQL password. |
 | `DB_NAME` | `server/.env` | Application database name. |
+| `JWT_SECRET` | `server/.env` | HS256 signing secret; at least 32 bytes and mandatory in production. Generate a long random value and do not commit it. |
 | `TMDB_TOKEN` | `server/.env` | Bearer token for TMDB sync and enrichment. |
 | `TMDB_SYNC_PAGES` | `server/.env` | Popular-result pages per media type; default `5`, maximum `500`. |
 | `FRONTEND_ORIGINS` | `server/.env` | Comma-separated allowed origins; default `http://localhost:3000,http://127.0.0.1:3000`. |
@@ -165,7 +166,7 @@ The current schema makes `media.tmdb_id` unique across movies and TV shows. Over
 
 ### Database relationships
 
-`media` stores common title fields. `movie` and `series` supply type-specific fields; series connect to seasons and episodes. Join tables associate titles with genres, cast/crew roles, and production houses. Users own watchlists and their items. The migration adds hashed session records, while rating and season summary views support title details.
+`media` stores common title fields. `movie` and `series` supply type-specific fields; series connect to seasons and episodes. Join tables associate titles with genres, cast/crew roles, and production houses. Users own watchlists and their items. The migration adds revocable hashed JWT session records, while rating and season summary views support title details.
 
 The schema also includes reviews, favourites, awards, and streaming-platform tables. These do not currently have corresponding editing workflows or public endpoints in the application.
 
@@ -233,7 +234,7 @@ Click a card or the featured About button to load title details, genres, credits
 
 Open the profile button to register or sign in. Registration requires a name, email, and an 8–128-character password. Passwords use salted scrypt hashes. Login and registration share a per-process limit of 15 attempts per IP per minute.
 
-Successful authentication sets an HttpOnly, SameSite=Lax session cookie lasting seven days. PostgreSQL stores only a SHA-256 hash of the random token. Browser API requests include credentials to restore sessions after reload. Logout removes the session and clears the cookie.
+Successful authentication sets a signed HS256 JWT in an HttpOnly, SameSite=Lax cookie lasting seven days. The JWT contains only standard identity/session claims; the user's role is deliberately read from PostgreSQL on every protected request. PostgreSQL stores only a SHA-256 hash of each active JWT, providing server-controlled revocation. Browser API requests include credentials to restore sessions after reload. Logout removes the stored JWT session and clears the cookie. In production, `JWT_SECRET` must contain at least 32 bytes; without it the API refuses to start. Development uses an ephemeral random secret when the variable is absent, so development sessions are invalidated whenever the API restarts.
 
 To create accounts for evaluation, run these commands from the project root:
 
@@ -345,7 +346,7 @@ The build writes frontend artifacts under `frontend/dist/`. The frontend also ex
 
 The frontend contains Sites/Cloudflare worker configuration in `frontend/.openai/hosting.json`, `vite.config.ts`, and `worker/`. Building does not publish the site, deploy Express/PostgreSQL, or apply migrations. Complete hosting requires a reachable API and PostgreSQL deployment as well as the frontend.
 
-Before deployment, apply migrations, set `NEXT_PUBLIC_API_URL` to the public HTTPS API address, configure `FRONTEND_ORIGINS`, and set `NODE_ENV=production` for secure API cookies. Keep frontend/API on the same site for the current SameSite=Lax cookie behavior; CORS alone does not enable cross-site authenticated fetches. Accounts use PostgreSQL-backed sessions rather than the frontend starter's optional ChatGPT identity helpers.
+Before deployment, apply migrations, set a strong `JWT_SECRET`, set `NEXT_PUBLIC_API_URL` to the public HTTPS API address, configure `FRONTEND_ORIGINS`, and set `NODE_ENV=production` for secure API cookies. Keep frontend/API on the same site for the current SameSite=Lax cookie behavior; CORS alone does not enable cross-site authenticated fetches. Accounts use signed, PostgreSQL-revocable JWT sessions rather than the frontend starter's optional ChatGPT identity helpers.
 
 ## Troubleshooting
 

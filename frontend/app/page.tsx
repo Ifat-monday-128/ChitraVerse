@@ -10,6 +10,8 @@ import ExternalTitle from "./external-title";
 import { HeroBackdrop, HeroCarousel } from "./hero-carousel";
 import { TitleFilterPanel, emptyFilters, filterParams, readFilters, type TitleFilters } from './search-filters';
 import HeaderSearch from "./header-search";
+import HomeDiscovery from './home-discovery';
+import AuthScreen from './auth-screen';
 import AnimatedDisclosure from './animated-disclosure';
 import { api, ApiError, posterUrl, trailerEmbedUrl, type Media, type Results, type User } from "./api";
 
@@ -298,6 +300,7 @@ export default function Home() {
       </>}
     </section>}
     {personId !== null && detailId === null && externalTitle === null && <section className="content-page" key={`person-${personId}`}><button className="back-button" onClick={back}>← Back</button><PersonProfile key={personId} id={personId} openTitle={openTitle} /></section>}
+    {isHome && <HomeDiscovery openTitle={openTitle} openPerson={openPerson} openGenre={id => go({ view: 'search', genre: String(id) })} />}
     {externalTitle !== null && <section className="content-page title-page" key={externalTitle}><button className="back-button" onClick={back}>← Back</button><ExternalTitle reference={externalTitle} openTitle={openTitle} /></section>}
     {menu && <Dialog title="Navigation" close={() => setMenu(false)}><h2>Explore</h2><nav className="menu-links">
       <button onClick={() => go()}>Home · Hollywood</button><button onClick={() => go({ view: "browse", type: "movie" })}>All movies</button>
@@ -323,16 +326,11 @@ export default function Home() {
     </section>}
     {adminOpen && user?.role === "admin" && <Dialog title="Users and activity" close={() => setAdminOpen(false)}><AdminUsers /></Dialog>}
     {homepageEditor && user?.role === 'admin' && <Dialog title="Manage homepage" close={() => setHomepageEditor(false)}><AdminHomepage saved={() => { setHomepageEditor(false); go(); setRetry(value => value + 1); }} /></Dialog>}
-    {account && <Dialog title={user ? "Your profile" : "Sign in"} close={() => setAccount(false)}>
-      {user ? <><p className="eyebrow">YOUR PROFILE</p><h2>{user.name}</h2><p>{user.email}</p><p>Role: {user.role || "Not assigned"}</p>{user.role !== "admin" && <p>{watchlist.length} saved {watchlist.length === 1 ? "title" : "titles"}</p>}
+    {account && !user && <AuthScreen register={register} busy={accountBusy} error={accountError} close={() => setAccount(false)} toggleMode={() => { setRegister(!register); setAccountError(""); }} submit={authenticate} />}
+    {account && user && <Dialog title="Your profile" close={() => setAccount(false)}>
+      <p className="eyebrow">YOUR PROFILE</p><h2>{user.name}</h2><p>{user.email}</p><p>Role: {user.role || "Not assigned"}</p>{user.role !== "admin" && <p>{watchlist.length} saved {watchlist.length === 1 ? "title" : "titles"}</p>}
         {user.role === 'admin' && <button className="primary-button" onClick={() => { setAccount(false); setHomepageEditor(true); }}>Manage homepage</button>}
-        <div className="detail-actions">{user.role === "admin" ? <button className="primary-button" onClick={() => { setAccount(false); setDetailId(null); setAdminOpen(true); }}>Users &amp; activity</button> : <button className="primary-button" onClick={() => { setAccount(false); setDetailId(null); go({ view: "watchlist" }); }}>Open watchlist</button>}<button className="secondary-button" disabled={accountBusy} onClick={logout}>Sign out</button></div></>
-        : <><h2>{register ? "Create an account" : "Welcome back"}</h2><p>Sign in to keep your movie and TV watchlist.</p><form className="account-form" onSubmit={authenticate}>
-          {register && <label>Name<input name="name" autoComplete="name" required maxLength={255} /></label>}
-          <label>Email<input name="email" type="email" autoComplete="email" required maxLength={255} /></label>
-          <label>Password<input name="password" type="password" autoComplete={register ? "new-password" : "current-password"} required minLength={register ? 8 : undefined} maxLength={128} /></label>
-          <button className="primary-button" disabled={accountBusy}>{accountBusy ? "Please wait…" : register ? "Create account" : "Sign in"}</button></form>
-          <button className="text-button" onClick={() => { setRegister(!register); setAccountError(""); }}>{register ? "Already have an account? Sign in" : "New here? Create an account"}</button></>}
+        <div className="detail-actions">{user.role === "admin" ? <button className="primary-button" onClick={() => { setAccount(false); setDetailId(null); setAdminOpen(true); }}>Users &amp; activity</button> : <button className="primary-button" onClick={() => { setAccount(false); setDetailId(null); go({ view: "watchlist" }); }}>Open watchlist</button>}<button className="secondary-button" disabled={accountBusy} onClick={logout}>Sign out</button></div>
       {accountError && <p className="message error" role="alert">{accountError}</p>}
     </Dialog>}
   </main>;

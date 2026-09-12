@@ -7,7 +7,7 @@ export const emptyFilters = { type:'all', genre:'', language:'', country:'', yea
 export type TitleFilters = typeof emptyFilters;
 export const filterParams = (filters: TitleFilters) => Object.fromEntries(Object.entries(filters).filter(([key,value]) => key in emptyFilters && value !== '' && value !== emptyFilters[key as keyof TitleFilters]));
 export const readFilters = (params: URLSearchParams): TitleFilters => Object.fromEntries(Object.entries(emptyFilters).map(([key,value]) => [key,params.get(key) ?? value])) as TitleFilters;
-export const sortNames: Record<string,string> = { relevance:'Best match', rating_desc:'Rating: high to low', rating_asc:'Rating: low to high', newest:'Newest releases', oldest:'Oldest releases', title_asc:'Title: A–Z', title_desc:'Title: Z–A', runtime_asc:'Shortest movies', runtime_desc:'Longest movies' };
+export const sortNames: Record<string,string> = { random:'Random order', relevance:'Best match', rating_desc:'Rating: high to low', rating_asc:'Rating: low to high', newest:'Newest releases', oldest:'Oldest releases', title_asc:'Title: A–Z', title_desc:'Title: Z–A', runtime_asc:'Shortest movies', runtime_desc:'Longest movies' };
 type Facets = { genres:{genre_id:number;name:string}[]; languages:string[]; countries:string[]; roles:{role_id:number;role_name:string}[] };
 let cachedFacets: Promise<Facets> | null = null;
 function useFacets() {
@@ -24,7 +24,7 @@ function useFacets() {
 }
 function displayName(code:string,type:'language'|'region') { try { return new Intl.DisplayNames(['en'],{type}).of(code) || code; } catch { return code; } }
 
-export function TitleFilterPanel({ value: applied, change }: { value:TitleFilters; change:(value:TitleFilters)=>void }) {
+export function TitleFilterPanel({ value: applied, change, defaultSort = 'relevance' }: { value:TitleFilters; change:(value:TitleFilters)=>void; defaultSort?: string }) {
   const [value,setValue] = useState(applied);
   const {data,error,retry}=useFacets();
   const update = (key:keyof TitleFilters, next:string) => setValue({...value,[key]:next});
@@ -36,8 +36,8 @@ export function TitleFilterPanel({ value: applied, change }: { value:TitleFilter
     <label>Production country<select value={value.country} onChange={event=>update('country',event.target.value)}><option value="">All countries</option>{data?.countries.map(code=><option key={code} value={code}>{displayName(code,'region')}</option>)}</select></label>
     {(['year','rating','runtime'] as const).map(group=>{ const low = {year:'year_from',rating:'rating_min',runtime:'runtime_min'}[group] as keyof TitleFilters; const high={year:'year_to',rating:'rating_max',runtime:'runtime_max'}[group] as keyof TitleFilters; return <fieldset className="filter-range" key={group}><legend>{group==='year'?'Release year':group==='rating'?'TMDB rating (0–10)':'Movie runtime (minutes)'}</legend><div><input aria-label={`Minimum ${group}`} type="number" min={group==='year'?1870:0} max={group==='year'?2200:group==='rating'?10:2000} step={group==='rating'?0.1:1} placeholder="From" value={value[low]} onChange={event=>update(low,event.target.value)} /><span>–</span><input aria-label={`Maximum ${group}`} type="number" min={group==='year'?1870:0} max={group==='year'?2200:group==='rating'?10:2000} step={group==='rating'?0.1:1} placeholder="To" value={value[high]} onChange={event=>update(high,event.target.value)} /></div></fieldset>;})}
     <label>Trailer<select value={value.trailer} onChange={event=>update('trailer',event.target.value)}><option value="">Any availability</option><option value="yes">Has a trailer</option><option value="no">No trailer</option></select></label>
-    <label>Sort by<select value={value.sort} onChange={event=>update('sort',event.target.value)}>{Object.entries(sortNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
-  </div>{error && <p role="alert">Filter options could not load. <button type="button" onClick={retry}>Retry</button></p>}<div className="filter-actions"><button className="primary-button" type="button" onClick={()=>change(value)}>Apply filters</button><button className="text-button" type="button" onClick={()=>{setValue({...emptyFilters});change({...emptyFilters});}}>Reset all filters</button></div></AnimatedDisclosure>;
+    <label>Sort by<select value={value.sort} onChange={event=>update('sort',event.target.value)}>{Object.entries(sortNames).filter(([key]) => key !== 'random' || defaultSort === 'random' || applied.sort === 'random').map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+  </div>{error && <p role="alert">Filter options could not load. <button type="button" onClick={retry}>Retry</button></p>}<div className="filter-actions"><button className="primary-button" type="button" onClick={()=>change(value)}>Apply filters</button><button className="text-button" type="button" onClick={()=>{const defaults = {...emptyFilters, sort: defaultSort}; setValue(defaults);change(defaults);}}>Reset all filters</button></div></AnimatedDisclosure>;
 }
 
 export const emptyPeopleFilters = { role:'',photo:'',born_from:'',born_to:'',sort:'name_asc' };

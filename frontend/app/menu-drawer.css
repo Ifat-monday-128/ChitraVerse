@@ -1,0 +1,45 @@
+.menu-drawer { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; padding: 0; margin: 0; border: 0; background: transparent; color: var(--ink); overflow: hidden; }
+.menu-drawer::backdrop { background: #04070b85; backdrop-filter: blur(3px); animation: drawer-backdrop-in .38s ease both; }
+.menu-drawer-panel { display: flex; flex-direction: column; width: min(330px, calc(100vw - 36px)); height: 100%; max-height: 100svh; background: linear-gradient(155deg, #202126, #16191e 60%, #14171b); border-right: 1px solid #d5bb752a; box-shadow: 22px 0 70px #0006; animation: drawer-slide-in .42s cubic-bezier(.16,1,.3,1) both; }
+.drawer-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 101px; padding: 25px 24px; border-bottom: 1px solid #ffffff0b; }
+.drawer-brand { background: none; border: 0; padding: 0; font-size: 23px; text-align: left; }
+.drawer-close { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; padding: 0; background: #ffffff04; color: #b5b9bf; border: 1px solid #ffffff16; border-radius: 50%; font-size: 25px; line-height: 1; }
+.drawer-close:hover { color: #f0dca3; border-color: #d5bb7560; }
+.drawer-navigation { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 0 28px; scrollbar-width: thin; scrollbar-color: #d5bb7538 transparent; }
+.drawer-group-label { padding: 0 31px; margin: 27px 0 13px; font-size: 10px; font-weight: 600; color: #8f969e; letter-spacing: 2px; }
+.drawer-links { display: grid; gap: 5px; padding: 0 15px; }
+.drawer-link { position: relative; display: flex; align-items: center; gap: 17px; width: 100%; min-height: 53px; padding: 13px 17px; border: 1px solid transparent; border-radius: 10px; background: transparent; text-align: left; font-size: 14px; color: #adb3bb; animation: drawer-item-in .35s ease var(--item-delay) backwards; transition: color .18s ease, background .18s ease, border-color .18s ease; }
+.drawer-link:hover { background: #ffffff04; color: #f0e5c7; }
+.drawer-link.is-active { background: linear-gradient(90deg, #d5bb7516, #d5bb7505); border-color: #d5bb7520; color: #eed89b; }
+.drawer-link.is-active::before { content: ''; position: absolute; left: -16px; top: 15px; bottom: 15px; width: 3px; background: var(--accent); border-radius: 0 3px 3px 0; box-shadow: 0 0 12px #d5bb7530; }
+.drawer-link-arrow { margin-left: auto; font-size: 21px; opacity: 0; transform: translateX(-4px); transition: opacity .18s, transform .18s; }
+.drawer-link:is(:hover, :focus-visible, .is-active) .drawer-link-arrow { opacity: .8; transform: translateX(0); }
+.drawer-footer { display: flex; align-items: center; gap: 10px; padding: 24px 32px; border-top: 1px solid #ffffff09; color: #8e969d; font-size: 11px; }
+.drawer-footer-mark { width: 5px; height: 5px; border-radius: 50%; background: #d5bb75; box-shadow: 0 0 12px #d5bb7538; }
+.drawer-icon { position: relative; display: block; flex: 0 0 20px; width: 20px; height: 20px; color: inherit; opacity: .85; }
+.drawer-icon::before, .drawer-icon::after { content: ''; position: absolute; box-sizing: border-box; }
+.drawer-icon-home::before { width: 14px; height: 13px; left: 3px; top: 6px; border: 1.5px solid currentColor; border-top: 0; border-radius: 2px; }
+.drawer-icon-home::after { width: 12px; height: 12px; left: 4px; top: 1px; border-left: 1.5px solid currentColor; border-top: 1.5px solid currentColor; transform: rotate(45deg); border-radius: 2px; }
+.drawer-icon-movies::before { inset: 2px 0; border: 1.5px solid currentColor; border-radius: 3px; }
+.drawer-icon-movies::after { inset: 2px 4px; border-left: 1px dashed currentColor; border-right: 1px dashed currentColor; }
+.drawer-icon-tv::before { inset: 3px 0 4px; border: 1.5px solid currentColor; border-radius: 3px; }
+.drawer-icon-tv::after { width: 10px; height: 3px; left: 5px; bottom: 0; border-bottom: 1.5px solid currentColor; }
+.drawer-icon-search::before { width: 14px; height: 14px; left: 0; top: 0; border: 1.5px solid currentColor; border-radius: 50%; }
+.drawer-icon-search::after { width: 9px; height: 1.5px; background: currentColor; left: 12px; top: 15px; transform: rotate(45deg); border-radius: 2px; }
+.drawer-icon-people::before { width: 8px; height: 8px; border: 1.5px solid currentColor; border-radius: 50%; top: 1px; left: 6px; }
+.drawer-icon-people::after { width: 18px; height: 9px; bottom: 0; left: 1px; border: 1.5px solid currentColor; border-radius: 10px 10px 3px 3px; }
+.drawer-icon-bookmark::before { inset: 1px 3px; border: 1.5px solid currentColor; border-radius: 2px; }
+.drawer-icon-bookmark::after { width: 8px; height: 8px; border-left: 1.5px solid currentColor; border-top: 1.5px solid currentColor; left: 6px; bottom: -2px; transform: rotate(45deg); background: #191c21; }
+.drawer-icon-edit::before { inset: 2px 0; border: 1.5px solid currentColor; border-radius: 3px; }
+.drawer-icon-edit::after { top: 7px; left: 0; width: 20px; height: 9px; border-top: 1.5px solid currentColor; border-left: 7px solid currentColor; opacity: .65; }
+.drawer-icon-activity::before { inset: 1px; border-left: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; }
+.drawer-icon-activity::after { left: 5px; top: 8px; width: 3px; height: 8px; background: currentColor; box-shadow: 5px -4px 0 currentColor, 10px -7px 0 currentColor; }
+.menu-drawer[data-closing="true"] .menu-drawer-panel { animation: drawer-slide-out .26s cubic-bezier(.4,0,1,1) both; pointer-events: none; }
+.menu-drawer[data-closing="true"]::backdrop { animation: drawer-backdrop-out .26s ease both; }
+@keyframes drawer-slide-in { from { transform: translateX(-102%); } to { transform: translateX(0); } }
+@keyframes drawer-slide-out { from { transform: translateX(0); } to { transform: translateX(-102%); } }
+@keyframes drawer-item-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes drawer-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drawer-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 380px) { .drawer-header { padding-inline: 19px; } .drawer-brand { font-size: 21px; } }
+@media (prefers-reduced-motion: reduce) { .menu-drawer *, .menu-drawer::backdrop { animation: none !important; transition: none !important; } }

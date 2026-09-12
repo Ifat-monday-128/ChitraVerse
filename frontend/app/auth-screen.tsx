@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import './auth-screen.css';
+import AuthPosters from './auth-posters';
+import BrandWordmark from './brand-wordmark';
 
 type AuthScreenProps = {
   register: boolean;
@@ -26,19 +28,12 @@ export default function AuthScreen({ register, busy, error, close, toggleMode, s
   return <dialog ref={dialog} className="auth-screen" aria-labelledby="auth-heading" onCancel={event => { event.preventDefault(); close(); }}>
     <div className="auth-stage">
       <div className="auth-atmosphere" aria-hidden="true"><span className="auth-orbit auth-orbit-one" /><span className="auth-orbit auth-orbit-two" /><span className="auth-orbit auth-orbit-three" /><span className="auth-sphere" /><span className="auth-light-line" /></div>
-      <header className="auth-header"><button type="button" className="auth-brand" onClick={close} aria-label="Back to ChitraVerse">CHITRA<span>VERSE</span><small>MOVIES BEYOND THE FRAME</small></button><button type="button" className="auth-close" onClick={close} aria-label="Close sign in"><span aria-hidden="true">×</span></button></header>
+      <header className="auth-header"><button type="button" className="auth-brand" onClick={close} aria-label="Back to ChitraVerse"><BrandWordmark /></button><button type="button" className="auth-close" onClick={close} aria-label="Close sign in"><span aria-hidden="true">×</span></button></header>
       <div className="auth-layout">
-        <section className="auth-story" aria-label="Welcome to ChitraVerse">
-          <p className="auth-kicker"><span /> YOUR NEXT GREAT STORY STARTS HERE</p>
-          <h1>Beyond the screen.<br /><span>Into your world.</span></h1>
-          <p className="auth-story-description">The films you love. The stories you haven’t found yet. A little universe of cinema, made yours.</p>
-          <div className="auth-story-note"><span className="auth-frame-mark" aria-hidden="true"><i /></span><p>Discover something unforgettable.<br /><strong>Keep it in your watchlist.</strong></p></div>
-          <div className="auth-story-bottom"><span>DISCOVER</span><i /><span>COLLECT</span><i /><span>GET INSPIRED</span></div>
-        </section>
+        <AuthPosters />
         <div className="auth-panel-area">
           <section className="auth-glass" aria-labelledby="auth-heading">
-            <div className="auth-panel-top"><span className="auth-monogram" aria-hidden="true">CV<span /></span><span>YOUR CHITRAVERSE ACCOUNT</span></div>
-            <div className="auth-intro"><p className="auth-kicker">{register ? 'MAKE YOURSELF AT HOME' : 'THE NEXT CHAPTER'}</p><h2 id="auth-heading">{register ? 'Join the story.' : 'Welcome back.'}</h2><p>{register ? 'Create an account and start your own movie collection.' : 'Sign in to pick up where you left off.'}</p></div>
+            <div className="auth-intro"><h2 id="auth-heading">{register ? 'Join the story.' : 'Welcome back.'}</h2><p>{register ? 'Create an account and start your own movie collection.' : 'Sign in to pick up where you left off.'}</p></div>
             <form className="auth-form" onSubmit={submit} aria-busy={busy} aria-describedby={error ? 'auth-error' : undefined}>
               <fieldset disabled={busy}>
                 {register && <div className="auth-field"><label htmlFor="auth-name">Your name</label><input id="auth-name" name="name" autoComplete="name" placeholder="How should we call you?" required maxLength={255} /></div>}

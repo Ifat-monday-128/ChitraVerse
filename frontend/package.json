@@ -9,7 +9,7 @@
     "dev": "vinext dev --config vite.config.ts",
     "build": "vinext build --config vite.config.ts",
     "start": "vinext start --config vite.config.ts",
-    "test": "npm run build && npm run typecheck && node --test tests/rendered-html.test.mjs",
+    "test": "npm run build && npm run typecheck && node --test tests/*.test.mjs",
     "typecheck": "node scripts/typecheck.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

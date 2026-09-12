@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type Media, type User } from "./api";
+import BrandWordmark from './brand-wordmark';
 
 const errorMessage = (error: unknown) => error instanceof ApiError ? error.message : "Could not connect. Please try again.";
 
@@ -29,7 +30,7 @@ export function MovieRating({ movie, user, updated, signIn }: { movie: Media; us
     finally { setBusy(false); }
   }
   return <section className="role-panel" aria-label="Movie ratings">
-    <h3>ChitraVerse rating</h3>
+    <h3><BrandWordmark /> rating</h3>
     <p>{movie.chitraverse_vote_count ? `${movie.chitraverse_rating}/10 · ${movie.chitraverse_vote_count} votes` : "No ratings yet. Be the first to rate this movie."}</p>
     {user?.role === "user" && <form onSubmit={submit} className="detail-actions">
       <label className="filter-label">Your rating<select required value={rating} disabled={loading || busy} onChange={event => { setRating(event.target.value); setSaved(false); }}>

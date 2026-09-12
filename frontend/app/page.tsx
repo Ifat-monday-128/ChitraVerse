@@ -12,14 +12,17 @@ import { TitleFilterPanel, emptyFilters, filterParams, readFilters, type TitleFi
 import HeaderSearch from "./header-search";
 import HomeDiscovery from './home-discovery';
 import AuthScreen from './auth-screen';
+import BrandWordmark from './brand-wordmark';
+import MenuDrawer from './menu-drawer';
 import AnimatedDisclosure from './animated-disclosure';
 import { api, ApiError, posterUrl, trailerEmbedUrl, type Media, type Results, type User } from "./api";
 
-type Route = TitleFilters & { view: "home" | "browse" | "search" | "watchlist" | "cast"; collection: string; q: string };
-const home: Route = { ...emptyFilters, view: "home", collection: "all", q: "" };
+type Route = TitleFilters & { view: "home" | "browse" | "search" | "watchlist" | "cast"; collection: string; q: string; seed: string };
+const home: Route = { ...emptyFilters, view: "home", collection: "all", q: "", seed: "" };
+const newShuffleSeed = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
 const message = (error: unknown) => error instanceof ApiError ? error.message : "Cannot reach the library. Check your connection and try again.";
 const year = (item: Media) => (item.release_date || item.first_air_date)?.slice(0, 4);
-const resultsPath = (route: Route, offset = 0) => `${route.view==='watchlist'?'/api/account/watchlist/search':`/api/media/${route.view === "search" ? "search" : ""}`}?${new URLSearchParams({ ...filterParams(route), type: route.type, collection: route.collection, q: route.q.trim(), limit: "24", offset: String(offset) })}`;
+const resultsPath = (route: Route, offset = 0) => `${route.view==='watchlist'?'/api/account/watchlist/search':`/api/media/${route.view === "search" ? "search" : ""}`}?${new URLSearchParams({ ...filterParams(route), ...(route.sort === 'random' ? { seed: route.seed } : {}), type: route.type, collection: route.collection, q: route.q.trim(), limit: "24", offset: String(offset) })}`;
 
 function Dialog({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -126,13 +129,16 @@ export default function Home() {
   }
   function go(next: Partial<Route> = {}) {
     setHeroHovered(false); setHeroFocused(false);
-    const value = { ...home, ...next };
+    const value = { ...home, sort: next.view === 'browse' ? 'random' : home.sort, ...next };
+    value.seed = value.sort === 'random' ? value.seed || newShuffleSeed() : '';
     const query = new URLSearchParams();
     if (value.view !== "home") query.set("view", value.view);
     if (value.type !== "all") query.set("type", value.type);
     if (value.collection !== "all") query.set("collection", value.collection);
     if (value.q) query.set("q", value.q);
     for (const [key,filterValue] of Object.entries(filterParams(value))) query.set(key,filterValue);
+    if (value.view === 'browse') query.set('sort', value.sort);
+    if (value.seed) query.set('seed', value.seed);
     window.history.pushState(null, "", query.size ? `/?${query}` : "/");
     setExternalTitle(null);
     setRoute(value); setDetailId(null); setPersonId(null); setCompanyId(null); setMenu(false); setError(""); window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
@@ -140,12 +146,19 @@ export default function Home() {
   useEffect(() => {
     function read() {
       const params = new URLSearchParams(window.location.search), view = params.get("view");
+      const sort = params.get('sort') || (view === 'browse' ? 'random' : emptyFilters.sort);
+      const seed = sort === 'random' ? (/^[a-f0-9]{32}$/.test(params.get('seed') || '') ? params.get('seed')! : newShuffleSeed()) : '';
+      if (seed && params.get('seed') !== seed) {
+        params.set('seed', seed);
+        window.history.replaceState(window.history.state, '', `/?${params}`);
+      }
       const external = params.get('external');
       setExternalTitle(external && /^(movie|series):[1-9]\d*$/.test(external) ? external : null);
       const readId = (name: string) => /^[1-9]\d*$/.test(params.get(name) || "") && Number(params.get(name)) <= 2147483647 ? Number(params.get(name)) : null;
       setDetailId(readId("title")); setPersonId(readId("person")); setCompanyId(readId("company"));
       setRoute({
         ...readFilters(params),
+        sort, seed,
         view: ["browse", "search", "watchlist", "cast"].includes(view || "") ? view as Route["view"] : "home",
         type: ["movie", "series"].includes(params.get("type") || "") ? params.get("type")! : "all",
         collection: params.get("collection") === "hollywood" ? "hollywood" : "all", q: (params.get("q") || "").slice(0, 120)
@@ -260,10 +273,10 @@ export default function Home() {
     <section className={`hero ${isHome ? "" : "compact"} ${isSearchPage ? "search-page-hero" : ""}`} onFocusCapture={event => setHeroFocused(Boolean(event.target.closest('.hero-copy, .hero-carousel-controls')))} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setHeroFocused(false); }}>
       {isHome && <HeroBackdrop url={heroImage} />}
       <header className={`topbar ${isDirectory && route.view === "search" ? "search-expanded" : ""}`}><div className="topbar-side">
-        <button className="icon-button menu" aria-label="Open menu" onClick={() => setMenu(true)}><i /><i /><i /></button>
+        <button className="icon-button menu" aria-label="Open menu" aria-expanded={menu} aria-controls="navigation-drawer" aria-haspopup="dialog" onClick={() => setMenu(true)}><i /><i /><i /></button>
         <HeaderSearch active={isDirectory && route.view === 'search'} query={route.q}
           open={() => go({ view: 'search' })} close={() => go()} change={changeSearch} submit={() => setRetry(current => current + 1)} /></div>
-        <Link className="brand" href="/" aria-label="ChitraVerse home" onClick={(event) => { event.preventDefault(); go(); }}>CHITRA<span>VERSE</span></Link>
+        <Link className="brand" href="/" aria-label="ChitraVerse home" onClick={(event) => { event.preventDefault(); go(); }}><BrandWordmark /></Link>
         <button className="avatar" aria-label="Open profile" onClick={() => { setAccount(true); setAccountError(""); }}>{user ? user.name.slice(0, 2).toUpperCase() : "CV"}</button>
       </header>
       {isHome && <div className="hero-copy" key={hero?.title_id ?? 'loading'}>{loading ? <p role="status">Loading your movie library…</p> : hero ? <>
@@ -274,7 +287,7 @@ export default function Home() {
         <div className="hero-actions" onMouseEnter={() => setHeroHovered(true)} onMouseLeave={() => setHeroHovered(false)}>{heroTrailer ? <button className="play-button" onClick={() => { setTrailerTitleId(hero.title_id); openTitle(hero.title_id); }}><span className="play-icon" /> TRAILER</button> : <span className="unavailable">Trailer unavailable</span>}
           <button className="about-button" onClick={() => openTitle(hero.title_id)}>ABOUT <span className="about-chevron" aria-hidden="true" /></button></div>
         {user?.role === 'admin' && <button className="text-button" onClick={() => setHomepageEditor(true)}>Edit homepage features</button>}
-      </> : <><p className="eyebrow">CHITRAVERSE</p><h1>{error ? "Library unavailable" : "No movies yet"}</h1>
+      </> : <><p className="eyebrow"><BrandWordmark /></p><h1>{error ? "Library unavailable" : "No movies yet"}</h1>
         <p className="description">{error || "No Hollywood movies are available in the library yet."}</p><button className="primary-button" onClick={() => setRetry((current) => current + 1)}>Try again</button></>}
       </div>}
       {isHome && !loading && hero && featuredItems.length > 1 && <HeroCarousel items={featuredItems} currentId={hero.title_id} select={setHero} paused={heroHovered || heroFocused || menu || account || adminOpen || homepageEditor} />}
@@ -285,11 +298,11 @@ export default function Home() {
     </section>
     {route.view === "cast" && <div hidden={!isDirectory}><CastDirectory query={route.q} search={q => go({ view: "cast", q })} openPerson={openPerson} /></div>}
     {companyId !== null && personId === null && <section hidden={detailId !== null} className="content-page" key={`company-${companyId}`}><button className="back-button" onClick={back}>← Back</button><ProductionProfile key={companyId} id={companyId} renderItems={titles => <div className="media-grid">{titles.map((item, index) => <Card key={item.title_id} item={item} index={index} open={openTitle} />)}</div>} /></section>}
-    {isDirectory && route.view !== "cast" && <section className="rail-section"><div className="section-heading"><div><p>{isHome ? "FROM YOUR LIBRARY" : "EXPLORE CHITRAVERSE"}</p><h2>{isHome ? "Hollywood movies" : heading}</h2></div>
+    {isDirectory && route.view !== "cast" && <section className="rail-section"><div className="section-heading"><div><p>{isHome ? "FROM YOUR LIBRARY" : <>EXPLORE <BrandWordmark /></>}</p><h2>{isHome ? "Hollywood movies" : heading}</h2></div>
       {isHome && items.length > 0 && <button aria-label="View all Hollywood movies" onClick={() => go({ view: "browse", type: "movie", collection: "hollywood" })}>→</button>}</div>
       {!isHome && route.view !== "search" && <AnimatedDisclosure key={route.view} kind="search" label={route.view === 'watchlist' ? 'Search your watchlist' : 'Search movies & series'}><form className="search-form" role="search" onSubmit={(event) => { event.preventDefault(); setRetry((current) => current + 1); }}>
         <label htmlFor="library-search">Search titles or actors</label><div className="search-field"><input id="library-search" type="search" value={route.q} maxLength={120} placeholder="Movie, TV show, actor or actress…" onChange={event => changeSearch(event.target.value)} /><button className="primary-button" type="submit">Search</button></div>
-      </form><TitleFilterPanel key={JSON.stringify(filterParams(route))} value={{...emptyFilters,...filterParams(route)}} change={filters=>go({...route,...filters})} /></AnimatedDisclosure>}
+      </form><TitleFilterPanel key={JSON.stringify(filterParams(route))} defaultSort={route.view === 'browse' ? 'random' : 'relevance'} value={{...emptyFilters,...filterParams(route)}} change={filters=>go({...route,...filters})} /></AnimatedDisclosure>}
       {route.view === 'search' && <TitleFilterPanel key={JSON.stringify(filterParams(route))} value={{...emptyFilters,...filterParams(route)}} change={filters=>go({...route,...filters})} />}
       {!isHome && error && <div className="message error" role="alert">{error}<button onClick={() => route.view === "watchlist" && !user ? setAccount(true) : setRetry((current) => current + 1)}>{route.view === "watchlist" && !user ? "Sign in" : "Try again"}</button></div>}
       {loading ? <p className="message" role="status">Loading library…</p> : <>
@@ -302,12 +315,16 @@ export default function Home() {
     {personId !== null && detailId === null && externalTitle === null && <section className="content-page" key={`person-${personId}`}><button className="back-button" onClick={back}>← Back</button><PersonProfile key={personId} id={personId} openTitle={openTitle} /></section>}
     {isHome && <HomeDiscovery openTitle={openTitle} openPerson={openPerson} openGenre={id => go({ view: 'search', genre: String(id) })} />}
     {externalTitle !== null && <section className="content-page title-page" key={externalTitle}><button className="back-button" onClick={back}>← Back</button><ExternalTitle reference={externalTitle} openTitle={openTitle} /></section>}
-    {menu && <Dialog title="Navigation" close={() => setMenu(false)}><h2>Explore</h2><nav className="menu-links">
-      <button onClick={() => go()}>Home · Hollywood</button><button onClick={() => go({ view: "browse", type: "movie" })}>All movies</button>
-      <button onClick={() => go({ view: "browse", type: "series" })}>TV shows</button><button onClick={() => go({ view: "search" })}>Search the library</button>
-      <button onClick={() => go({ view: "cast" })}>Cast &amp; crew</button>
-      {user?.role === 'admin' && <button onClick={() => { setMenu(false); setHomepageEditor(true); }}>Manage homepage</button>}
-      {user?.role === "admin" ? <button onClick={() => { setMenu(false); setAdminOpen(true); }}>Users &amp; activity</button> : <button onClick={() => go({ view: "watchlist" })}>My watchlist</button>}</nav></Dialog>}
+    {menu && <MenuDrawer close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} items={[
+      { label: 'Home · Hollywood', icon: 'home', active: isHome, action: () => go() },
+      { label: 'All movies', icon: 'movies', active: isDirectory && route.view === 'browse' && route.type === 'movie', action: () => go({ view: 'browse', type: 'movie' }) },
+      { label: 'TV shows', icon: 'tv', active: isDirectory && route.view === 'browse' && route.type === 'series', action: () => go({ view: 'browse', type: 'series' }) },
+      { label: 'Search the library', icon: 'search', active: isDirectory && route.view === 'search', action: () => go({ view: 'search' }) },
+      { label: 'Cast & crew', icon: 'people', active: isDirectory && route.view === 'cast', action: () => go({ view: 'cast' }) },
+    ]} library={user?.role === 'admin' ? [
+      { label: 'Manage homepage', icon: 'edit', action: () => setHomepageEditor(true) },
+      { label: 'Users & activity', icon: 'activity', action: () => setAdminOpen(true) },
+    ] : [{ label: 'My watchlist', icon: 'bookmark', active: isDirectory && route.view === 'watchlist', action: () => go({ view: 'watchlist' }) }]} />}
     {detailId !== null && <section className="content-page title-page" key={detailId} aria-label={detail ? `About ${detail.title}` : "Title details"}><button className="back-button" onClick={back}>← Back</button>
       {detailError && <p className="message error" role="alert">{detailError}</p>}{!detail ? !detailError && <p role="status">Loading title…</p> : <>
         <div className="detail-heading"><div className="detail-poster"><Poster item={detail} /></div><div><p className="eyebrow">{detail.media_type === "series" ? "TV series" : "Movie"} {year(detail) && `· ${year(detail)}`}</p><h2>{detail.title}</h2>

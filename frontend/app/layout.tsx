@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./brand-wordmark.css";
 
 export const metadata: Metadata = {
-  title: "ChitraVerse — Movies beyond the frame",
+  title: "ChitraVerse",
   description: "Discover movies and series in ChitraVerse.",
 };
 

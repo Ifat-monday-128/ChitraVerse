@@ -18,8 +18,8 @@ exports.getPerson = async (personId) => {
     WHERE mc.cast_crew_id = $1 AND (mo.title_id IS NOT NULL OR s.title_id IS NOT NULL)
     GROUP BY m.title_id, mo.title_id, s.title_id
     ORDER BY COALESCE(mo.release_date, s.first_air_date) DESC NULLS LAST, m.title, m.title_id`, [personId]);
-  // The local schema has no death date/life status or birthplace. Do not invent them.
-  return { ...person, deathday: null, age: null, place_of_birth: null,
+  // Calculate completed years from the stored birthday; no age is persisted.
+  return { ...person, deathday: null, age: ageAt(person.date_of_birth), place_of_birth: null,
     profile_source: 'library', filmography };
 };
 exports.ageAt = ageAt;

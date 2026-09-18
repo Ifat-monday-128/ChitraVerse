@@ -69,7 +69,8 @@ test("person profiles return photos and deduplicated movie/series credits with v
   assert.equal(result.body.photo, '/portrait.jpg');
   assert.equal(result.body.biography, 'Stored biography');
   assert.equal(result.body.date_of_birth, '1980-06-15');
-  assert.equal(result.body.age, null); // Unknown life status must not fabricate a current age.
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal(result.body.age, Number(today.slice(0, 4)) - 1980 - (today.slice(5) < '06-15' ? 1 : 0));
   assert.equal(result.body.filmography.length, 2);
   assert.deepEqual(new Set(result.body.filmography.map(item => item.media_type)), new Set(['movie', 'series']));
   assert.deepEqual(result.body.filmography.find(item => item.title_id === ids.Interstellar).roles, ['Actor', 'Director']);

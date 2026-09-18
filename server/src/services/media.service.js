@@ -62,12 +62,16 @@ exports.browse = async ({ type, collection, limit, offset, q = "", companyId, wa
   }
   const source = `${joins} ${searchJoins} WHERE ${conditions.join(" AND ")}`;
   const { rows: count } = await pool.query(`SELECT COUNT(*)::int AS total FROM (SELECT ${score} AS relevance ${source}) matches`, values);
+  // Hash the stable title ID with one seed for the whole browsing visit.
+  // ORDER BY random() would reshuffle each page and repeat or skip titles.
+  const seed = filters.sort === 'random' ? filters.seed || require('node:crypto').randomBytes(16).toString('hex') : undefined;
+  const order = seed ? `md5(m.title_id::text || ':' || ${bind(seed)}::text)` : require('../utils/searchFilters').order(filters.sort);
   const limitParam = bind(limit);
   const offsetParam = bind(offset);
   const { rows } = await pool.query(`SELECT ${columns}, ${score} AS relevance ${source}
-    ORDER BY ${require('../utils/searchFilters').order(filters.sort)}, m.title_id
+    ORDER BY ${order}, m.title_id
     LIMIT ${limitParam} OFFSET ${offsetParam}`, values);
-  return { items: rows, total: count[0].total, hasMore: offset + rows.length < count[0].total, query: q };
+  return { items: rows, total: count[0].total, hasMore: offset + rows.length < count[0].total, query: q, ...(seed ? { seed } : {}) };
 };
 
 exports.getDetails = async (titleId) => {

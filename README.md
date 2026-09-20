@@ -248,14 +248,18 @@ Each command prints a new random password once and saves only its salted hash. S
 
 For each account, sign in and check the role in the profile. Regular users can open a movie, save a whole-number rating from 1 to 10, update that rating, and manage their watchlist. Admins see Users & activity after login and can reopen it from the profile or menu. Admins cannot rate movies or access watchlists (the backend returns 403). Sign out before testing the next account. The server deletes that session on logout, so replaying its cookie returns `401` from `/api/account/me` and watchlist endpoints. The frontend clears the account only after logout succeeds. Invalid credentials return `401`; missing or malformed fields return `400`.
 
-Signed-in users can save/remove titles through a detail dialog. The API creates a default “My watchlist” when needed, prevents duplicate items, and scopes operations to the current user. Watchlists persist in PostgreSQL. A signed-out save attempt opens the account dialog; after signing in, click save again.
+Signed-in viewers can create, rename, and delete multiple named watchlists from **My Watchlists**. **Add to watchlist** opens a chooser showing membership in each list; checking or unchecking saves that individual change immediately. Creating a list in the chooser leaves it unchecked until selected. A title can belong to several lists, and removing it from one does not affect the others. Existing lists and items are preserved. No list is selected automatically. List URLs use `?view=watchlist&list=ID` and preserve browser Back/Forward.
+
+**Favorites** is a separate library at `?view=favorites`, using the existing `favourite` table. The title-page heart button saves/removes movies or series and restores its state on refresh. All library requests use the authenticated server user, ignore client-supplied user IDs, and check list ownership. Admins retain their administration-only experience. Watchlist primary keys prevent duplicate memberships; favorite writes are serialized per user in short transactions to prevent concurrent duplicates without a schema change.
+
+The homepage discovery order is Popular Interests, Box Office, **Released Today**, then Born Today. Released Today queries existing movie release dates and series first-air dates by month/day, across historical years, excluding dates later than the requested day. The UI follows the visitor's local calendar, updates after midnight, and supports loading, retry, and empty states. Dates are validated, including leap days; no provider API or new table is used.
 
 ### Ratings and admin activity
 
-Movie details show the ChitraVerse average and vote count from the existing `media_rating_summary` view. Ratings use the existing `review` table, with one active vote per user/movie through the API; saving again replaces the vote. No database migration is needed for these features.
+Movie and series details show the ChitraVerse average and vote count from the existing `media_rating_summary` view. Ratings use the existing `review` table, with one active vote per user/title through the API; saving again replaces the vote. The interactive panel appears after the description and before the trailer. Title headers and the homepage hero show the same database aggregate beside TMDB; unrated titles display an em dash. No new migration is needed for this update; the existing migrations are still required for sessions, search, and homepage features.
 
 - `GET /api/account/ratings/:titleId`: read the current user's rating.
-- `PUT /api/account/ratings/:titleId`: save `{ "rating": 8 }`; requires the database role `user` and a movie ID.
+- `PUT /api/account/ratings/:titleId`: save `{ "rating": 8 }`; requires the database role `user` and a movie or series ID.
 - `GET /api/account/admin/users`: admin-only account list with names, emails, roles, joined dates, latest ratings and currently saved watchlist items. Password hashes and session tokens are never included.
 
 Activity is a snapshot of existing records, not a historical audit log: replaced ratings and removed watchlist items are not listed. All account endpoints require a valid server session; unauthorized roles receive 403 and signed-out requests receive 401.
@@ -276,9 +280,18 @@ Paths are relative to the API base URL. Bodies use JSON; authenticated calls req
 | POST | `/api/account/register` | Body: `{ "name": "...", "email": "...", "password": "..." }`; creates a session. |
 | POST | `/api/account/login` | Body: `{ "email": "...", "password": "..." }`; creates a session. |
 | POST | `/api/account/logout` | Invalidates the session and returns `{ user: null }`. |
-| GET | `/api/account/watchlist` | Returns the current user's `{ items }`. |
-| PUT | `/api/account/watchlist/:titleId` | Saves a title; returns `{ saved: true }`. |
-| DELETE | `/api/account/watchlist/:titleId` | Removes a title from the user's lists; returns `{ saved: false }`. |
+| GET | `/api/media/home/releases?date=YYYY-MM-DD` | Historical same-day movie/series releases; defaults to today's date in Asia/Dhaka. |
+| GET | `/api/account/watchlists?title_id=ID` | Owned lists with counts and optional title membership. |
+| POST | `/api/account/watchlists` | Create a named list with `{ "name": "Weekend" }`. |
+| GET | `/api/account/watchlists/:listId` | Owned list and its movie/series cards; unowned/missing IDs return 404. |
+| PATCH | `/api/account/watchlists/:listId` | Rename an owned list with `{ "name": "Classics" }`. |
+| DELETE | `/api/account/watchlists/:listId` | Delete only this owned list and its memberships. |
+| PUT / DELETE | `/api/account/watchlists/:listId/items/:titleId` | Add/remove a title in one owned list. |
+| GET | `/api/account/favorites` | Current user's favorite movies and series. |
+| GET | `/api/account/favorites/:titleId` | Current user's `{ saved }` state. |
+| PUT / DELETE | `/api/account/favorites/:titleId` | Add/remove the current user's favorite. |
+| GET | `/api/account/watchlist`, `/api/account/watchlist/search` | Legacy read-only combined view of owned lists. |
+| PUT / DELETE | `/api/account/watchlist/:titleId` | Returns 400: callers must explicitly choose a list. |
 
 Browse/search parameters:
 

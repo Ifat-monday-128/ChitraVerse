@@ -5,6 +5,7 @@ import { api, type Media } from './api';
 import { PersonPhoto } from './person-profile';
 import './home-discovery.css';
 import PopularInterests from './popular-interests';
+import Card from './media-card';
 
 type BoxMovie = Media & { box_office_gross: string; budget: string | null };
 type Birthday = { cast_crew_id: number; name: string; photo: string | null; date_of_birth: string; roles: string[] };
@@ -103,6 +104,37 @@ function BornToday({ openPerson }: { openPerson: (id: number) => void }) {
   </section>;
 }
 
+export function ReleasedToday({ openTitle }: { openTitle: (id: number) => void }) {
+  const [date, setDate] = useState('');
+  const [data, setData] = useState<{ date: string; items: Media[] } | null>(null);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const update = () => setDate(localDate());
+    update();
+    const timer = setInterval(update, 60000);
+    document.addEventListener('visibilitychange', update);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', update); };
+  }, []);
+  useEffect(() => {
+    if (!date) return;
+    const controller = new AbortController();
+    api<{ date: string; items: Media[] }>(`/api/media/home/releases?date=${date}`, { signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) { setData(result); setError(false); } })
+      .catch(() => { if (!controller.signal.aborted) setError(true); });
+    return () => controller.abort();
+  }, [date, retry]);
+  const current = data?.date === date ? data : null;
+  const dateLabel = date ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)) : '';
+  return <section className="discovery-section released-section" aria-labelledby="released-heading">
+    <div className="discovery-heading"><div><p className="eyebrow">ON THIS DAY IN CINEMA</p><h2 id="released-heading">Released <span>Today</span></h2><p>Movies and series that premiered on this day{dateLabel ? ` · ${dateLabel}` : ''}</p></div></div>
+    {error ? <div className="discovery-message" role="alert">Today’s releases couldn’t be loaded. <button onClick={() => { setError(false); setData(null); setRetry(value => value + 1); }}>Try again</button></div>
+      : !current ? <p className="discovery-message" role="status">Finding today’s releases…</p>
+      : !current.items.length ? <p className="discovery-message">No releases recorded for {dateLabel} in your library. Check back tomorrow.</p>
+      : <div className="media-rail" aria-label="Released Today titles">{current.items.map((item, index) => <Card key={`${item.media_type}-${item.title_id}`} item={item} index={index} open={openTitle} />)}</div>}
+  </section>;
+}
+
 export default function HomeDiscovery({ openTitle, openPerson, openGenre }: { openTitle: (id: number) => void; openPerson: (id: number) => void; openGenre: (id: number) => void }) {
-  return <div className="home-discovery"><PopularInterests openGenre={openGenre} /><BoxOffice openTitle={openTitle} /><BornToday openPerson={openPerson} /></div>;
+  return <div className="home-discovery"><PopularInterests openGenre={openGenre} /><BoxOffice openTitle={openTitle} /><ReleasedToday openTitle={openTitle} /><BornToday openPerson={openPerson} /></div>;
 }

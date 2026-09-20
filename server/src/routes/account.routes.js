@@ -157,14 +157,14 @@ router.put('/admin/homepage', async (req, res) => {
   finally { client.release(); }
 });
 router.get("/ratings/:titleId", async (req, res) => {
-  if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate movies." });
+  if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate titles." });
   const titleId = Number(req.params.titleId);
   if (!Number.isSafeInteger(titleId) || titleId < 1) return res.status(400).json({ error: "Invalid title ID" });
   const { rows } = await pool.query("SELECT rating FROM review WHERE user_id=$1 AND title_id=$2 ORDER BY created_at DESC,review_id DESC LIMIT 1", [req.user.user_id,titleId]);
   res.json({ rating: rows[0]?.rating ?? null });
 });
 router.put("/ratings/:titleId", async (req, res) => {
-  if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate movies." });
+  if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate titles." });
   const titleId = Number(req.params.titleId), rating = req.body?.rating;
   if (!Number.isSafeInteger(titleId) || titleId < 1 || !Number.isInteger(rating) || rating < 1 || rating > 10) {
     return res.status(400).json({ error: "Choose a whole-number rating from 1 to 10." });
@@ -174,8 +174,8 @@ router.put("/ratings/:titleId", async (req, res) => {
     await client.query("BEGIN");
     // Serialize this user's rating writes without altering the existing review schema.
     await client.query("SELECT pg_advisory_xact_lock($1)", [req.user.user_id]);
-    if (!(await client.query("SELECT 1 FROM movie WHERE title_id=$1", [titleId])).rowCount) {
-      await client.query("ROLLBACK"); return res.status(404).json({ error: "Movie not found." });
+    if (!(await client.query("SELECT 1 FROM media m WHERE title_id=$1 AND (EXISTS(SELECT 1 FROM movie WHERE title_id=m.title_id) OR EXISTS(SELECT 1 FROM series WHERE title_id=m.title_id)) FOR KEY SHARE", [titleId])).rowCount) {
+      await client.query("ROLLBACK"); return res.status(404).json({ error: "Title not found." });
     }
     const existing = await client.query("SELECT review_id FROM review WHERE user_id=$1 AND title_id=$2 ORDER BY created_at DESC,review_id DESC", [req.user.user_id,titleId]);
     if (existing.rowCount) {
@@ -204,29 +204,8 @@ router.get("/watchlist", async (req, res) => {
     LEFT JOIN movie mo USING(title_id) WHERE w.user_id=$1 ORDER BY m.title`, [req.user.user_id]);
   res.json({ items: rows });
 });
-router.put("/watchlist/:titleId", async (req, res) => {
-  const titleId = Number(req.params.titleId);
-  if (!Number.isInteger(titleId) || titleId < 1) return res.status(400).json({ error: "Invalid title ID" });
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    // Serialize default-list creation without changing the existing watchlist schema.
-    await client.query("SELECT pg_advisory_xact_lock($1)", [req.user.user_id]);
-    const media = await client.query("SELECT 1 FROM media WHERE title_id=$1", [titleId]);
-    if (!media.rowCount) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Media not found" }); }
-    let { rows } = await client.query("SELECT watchlist_id FROM watchlist WHERE user_id=$1 ORDER BY watchlist_id LIMIT 1", [req.user.user_id]);
-    if (!rows.length) ({ rows } = await client.query("INSERT INTO watchlist(user_id,name) VALUES($1,'My watchlist') RETURNING watchlist_id", [req.user.user_id]));
-    await client.query("INSERT INTO watchlist_item(watchlist_id,title_id) VALUES($1,$2) ON CONFLICT DO NOTHING", [rows[0].watchlist_id, titleId]);
-    await client.query("COMMIT");
-    res.json({ saved: true });
-  } catch (error) { await client.query("ROLLBACK"); throw error; }
-  finally { client.release(); }
-});
-router.delete("/watchlist/:titleId", async (req, res) => {
-  const titleId = Number(req.params.titleId);
-  if (!Number.isInteger(titleId) || titleId < 1) return res.status(400).json({ error: "Invalid title ID" });
-  await pool.query(`DELETE FROM watchlist_item wi USING watchlist w
-    WHERE wi.watchlist_id=w.watchlist_id AND w.user_id=$1 AND wi.title_id=$2`, [req.user.user_id, titleId]);
-  res.json({ saved: false });
-});
+// Legacy writes must never silently pick a list or remove from every list.
+router.route('/watchlist/:titleId').put((req, res) => res.status(400).json({ error: 'Choose a watchlist first.' }))
+  .delete((req, res) => res.status(400).json({ error: 'Choose a watchlist first.' }));
+router.use(require('./library.routes'));
 module.exports = router;

@@ -1,5 +1,20 @@
 const pool = require('../config/db');
 
+exports.releases = async (date) => {
+  const { rows } = await pool.query(`WITH releases AS (
+    SELECT title_id,release_date AS released_on,'movie' AS media_type FROM movie
+    UNION ALL
+    SELECT title_id,first_air_date AS released_on,'series' AS media_type FROM series
+  ) SELECT m.title_id,m.title,m.poster,m.tmdb_rating,r.media_type,
+    to_char(r.released_on,'YYYY-MM-DD') AS release_date
+    FROM releases r JOIN media m USING(title_id)
+    WHERE EXTRACT(MONTH FROM r.released_on)=EXTRACT(MONTH FROM $1::date)
+      AND EXTRACT(DAY FROM r.released_on)=EXTRACT(DAY FROM $1::date)
+      AND r.released_on <= $1::date
+    ORDER BY r.released_on DESC,m.title,m.title_id`, [date]);
+  return { date, items: rows };
+};
+
 exports.interests = async () => {
   const { rows } = await pool.query(`WITH ranked AS (
     SELECT g.genre_id, g.name, m.title_id, m.title, m.poster,

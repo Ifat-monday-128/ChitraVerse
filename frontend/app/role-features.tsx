@@ -6,6 +6,10 @@ import BrandWordmark from './brand-wordmark';
 
 const errorMessage = (error: unknown) => error instanceof ApiError ? error.message : "Could not connect. Please try again.";
 
+export function ChitraVerseRating({ item }: { item: Media }) {
+  return <span className="chitraverse-rating">ChitraVerse {item.chitraverse_vote_count && item.chitraverse_rating != null ? item.chitraverse_rating : '—'}</span>;
+}
+
 export function MovieRating({ movie, user, updated, signIn }: { movie: Media; user: User | null; updated: (data: Partial<Media>) => void; signIn: () => void }) {
   const [rating, setRating] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,9 +33,9 @@ export function MovieRating({ movie, user, updated, signIn }: { movie: Media; us
     } catch (error) { setError(errorMessage(error)); }
     finally { setBusy(false); }
   }
-  return <section className="role-panel" aria-label="Movie ratings">
+  return <section className="role-panel" aria-label="ChitraVerse ratings">
     <h3><BrandWordmark /> rating</h3>
-    <p>{movie.chitraverse_vote_count ? `${movie.chitraverse_rating}/10 · ${movie.chitraverse_vote_count} votes` : "No ratings yet. Be the first to rate this movie."}</p>
+    <p>{movie.chitraverse_vote_count ? `${movie.chitraverse_rating}/10 · ${movie.chitraverse_vote_count} votes` : "No ratings yet. Be the first to rate this title."}</p>
     {user?.role === "user" && <form onSubmit={submit} className="detail-actions">
       <label className="filter-label">Your rating<select required value={rating} disabled={loading || busy} onChange={event => { setRating(event.target.value); setSaved(false); }}>
         <option value="">Choose a rating</option>{Array.from({ length: 10 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}/10</option>)}
@@ -59,7 +63,7 @@ export function AdminUsers() {
     return () => controller.abort();
   }, [retry]);
   return <section aria-label="Users and activity"><p className="eyebrow">ADMIN</p><h2>Users &amp; activity</h2>
-    <p>Registered accounts, their latest movie ratings, and currently saved watchlist titles.</p>
+    <p>Registered accounts, their latest title ratings, and currently saved watchlist titles.</p>
     <button className="secondary-button" disabled={loading} onClick={() => { setLoading(true); setRetry(value => value + 1); }}>Refresh</button>
     {loading ? <p role="status">Loading users…</p> : error ? <p role="alert" className="message error">{error}</p> : <>
       <p>{users.length} registered accounts</p>

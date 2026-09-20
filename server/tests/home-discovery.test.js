@@ -25,11 +25,33 @@ test.after(async () => {
 });
 
 test('empty discovery sections return usable arrays', async () => {
-  for (const path of ['/interests', '/box-office', '/birthdays?date=2026-09-12']) {
+  for (const path of ['/interests', '/box-office', '/birthdays?date=2026-09-12', '/releases?date=2026-09-18']) {
     const response = await fetch(`${base}/api/media/home${path}`);
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).items, []);
   }
+});
+
+test('released today matches historical movies and first-air dates, excludes future and wrong days, supports leap day', async () => {
+  for (const type of ['movie', 'series']) {
+    for (const [label, date] of [['Historical', '1994-09-18'], ['Recent', '2005-09-18'], ['Today', '2026-09-18'], ['Future', '2030-09-18'], ['Wrong day', '2005-09-19'], ['Wrong month', '2005-10-18'], ['Leap', '2000-02-29'], ['Unknown', null]]) {
+      const id = (await pool.query('INSERT INTO media(title) VALUES($1) RETURNING title_id', [`${type} ${label}`])).rows[0].title_id;
+      await pool.query(`INSERT INTO ${type}(title_id,${type === 'movie' ? 'release_date' : 'first_air_date'}) VALUES($1,$2)`, [id, date]);
+    }
+  }
+  const read = async date => (await fetch(`${base}/api/media/home/releases?date=${date}`)).json();
+  const today = await read('2026-09-18');
+  assert.equal(today.date, '2026-09-18');
+  assert.deepEqual(today.items.map(item => item.title), ['movie Today', 'series Today', 'movie Recent', 'series Recent', 'movie Historical', 'series Historical']);
+  assert.deepEqual(today.items.map(item => item.media_type), ['movie', 'series', 'movie', 'series', 'movie', 'series']);
+  assert.equal(today.items[4].release_date, '1994-09-18');
+  assert.deepEqual((await read('2024-02-29')).items.map(item => item.title), ['movie Leap', 'series Leap']);
+  assert.deepEqual((await read('2025-02-28')).items, []);
+  // Missing/invalid stored dates cannot match (PostgreSQL DATE rejects impossible values).
+  for (const date of ['2026-02-29', '2024-02-30', '2026-13-01', 'bad', '', '2026-09-18&date=2026-09-19']) {
+    assert.equal((await fetch(`${base}/api/media/home/releases?date=${date}`)).status, 400);
+  }
+  assert.equal((await fetch(`${base}/api/media/home/releases`)).status, 200);
 });
 
 test('box office ranks lifetime gross numerically, excludes unknowns and limits to ten', async () => {

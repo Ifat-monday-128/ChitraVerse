@@ -7,6 +7,8 @@ dist/
 .vinext/
 .wrangler/
 coverage/
+frontend/test-results/
+frontend/playwright-report/
 *.log
 *.backup
 .DS_Store

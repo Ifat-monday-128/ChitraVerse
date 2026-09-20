@@ -67,7 +67,7 @@ test("users rate movies once; admin can inspect activity but cannot rate or use 
     assert.equal((await request('/api/account/watchlist'+(method==='GET'?'':`/${movie}`),{method,cookie:adminCookie})).status,403);
   }
   for (const rating of [0,11,1.5,'8',null]) assert.equal((await request(endpoint,{method:'PUT',cookie:user,body:{rating}})).status,400);
-  assert.equal((await request(`/api/account/ratings/${series}`,{method:'PUT',cookie:user,body:{rating:8}})).status,404);
+  assert.equal((await request(`/api/account/ratings/${series}`,{method:'PUT',cookie:user,body:{rating:8}})).status,200);
   const rate = rating => request(endpoint,{method:'PUT',cookie:user,body:{rating,user_id:2,role:'admin'}});
   assert.equal((await rate(8)).body.chitraverse_rating,'8.0');
   const update = await rate(6);
@@ -83,12 +83,13 @@ test("users rate movies once; admin can inspect activity but cannot rate or use 
   assert.equal((await request(endpoint,{cookie:user})).body.rating,'6.0');
   const details = await request(`/api/media/${movie}`);
   assert.equal(details.body.chitraverse_rating,'8.0');
-  assert.equal((await request(`/api/account/watchlist/${movie}`,{method:'PUT',cookie:user})).status,200);
+  const list = (await request('/api/account/watchlists', {cookie:user,body:{name:'Rated movies'}})).body.watchlist;
+  assert.equal((await request(`/api/account/watchlists/${list.watchlist_id}/items/${movie}`,{method:'PUT',cookie:user})).status,200);
   const users = await request('/api/account/admin/users',{cookie:adminCookie});
   assert.equal(users.status,200);
   assert.ok(users.body.users.every(row=>!('password_hash' in row)));
   const activity = users.body.users.find(row=>row.email==='user@example.invalid').activities;
-  assert.equal(activity.length,2);
+  assert.equal(activity.length,3);
   assert.ok(activity.some(row=>row.kind==='rating' && Number(row.rating)===6));
   assert.ok(activity.some(row=>row.kind==='watchlist'));
   await request('/api/account/logout',{method:'POST',cookie:adminCookie});
@@ -140,8 +141,10 @@ test('watchlist search filters only the authenticated user’s saved titles', as
     const id=(await pool.query('INSERT INTO media(title,tmdb_rating) VALUES($1,9) RETURNING title_id',[title])).rows[0].title_id;
     await pool.query("INSERT INTO movie(title_id,release_date,runtime) VALUES($1,'2015-01-01',100)",[id]);ids.push(id);
   }
-  await request(`/api/account/watchlist/${ids[0]}`,{method:'PUT',cookie:userCookie});
-  await request(`/api/account/watchlist/${ids[1]}`,{method:'PUT',cookie:otherCookie});
+  for (const [index,cookie] of [userCookie,otherCookie].entries()) {
+    const list=(await request('/api/account/watchlists',{cookie,body:{name:'Private filters'}})).body.watchlist;
+    await request(`/api/account/watchlists/${list.watchlist_id}/items/${ids[index]}`,{method:'PUT',cookie});
+  }
   const url='/api/account/watchlist/search?q=Private%20filter&rating_min=8&year_from=2010&runtime_max=120&sort=title_asc';
   assert.equal((await request(url)).status,401);
   const result=await request(url+'&user_id=999',{cookie:userCookie});

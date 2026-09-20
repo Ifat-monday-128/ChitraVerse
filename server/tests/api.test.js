@@ -251,7 +251,8 @@ test("sessions and watchlists persist, stay private and reject unauthorized writ
   const headers = { Cookie: registered.cookie };
   const stored = await pool.query("SELECT password_hash FROM users WHERE email=$1", [payload.email]); assert.notEqual(stored.rows[0].password_hash, payload.password);
   assert.equal((await request("/api/account/me", { headers })).body.user.email, payload.email);
-  const url = `/api/account/watchlist/${ids.Interstellar}`;
+  const list = await request('/api/account/watchlists', { method: 'POST', headers, body: JSON.stringify({ name: 'My movies' }) });
+  const url = `/api/account/watchlists/${list.body.watchlist.watchlist_id}/items/${ids.Interstellar}`;
   assert.equal((await request(url, { method: "PUT", headers })).status, 200);
   await request(url, { method: "PUT", headers });
   assert.equal((await request("/api/account/watchlist", { headers })).body.items.length, 1);

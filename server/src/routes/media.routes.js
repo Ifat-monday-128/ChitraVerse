@@ -23,6 +23,16 @@ router.get('/home/birthdays', async (req, res, next) => {
   try { res.json(await require('../services/home-discovery.service').birthdays(date)); }
   catch (error) { next(error); }
 });
+router.get('/home/releases', async (req, res, next) => {
+  const date = req.query.date ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    || !Number.isFinite(Date.parse(`${date}T00:00:00Z`))
+    || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
+    return res.status(400).json({ error: 'Provide a valid date in YYYY-MM-DD format' });
+  }
+  try { res.json(await require('../services/home-discovery.service').releases(date)); }
+  catch (error) { next(error); }
+});
 router.get("/search", mediaController.browse);
 router.get('/filters', async (req, res, next) => {
   try {

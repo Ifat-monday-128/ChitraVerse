@@ -163,6 +163,31 @@ router.get("/ratings/:titleId", async (req, res) => {
   const { rows } = await pool.query("SELECT rating FROM review WHERE user_id=$1 AND title_id=$2 ORDER BY created_at DESC,review_id DESC LIMIT 1", [req.user.user_id,titleId]);
   res.json({ rating: rows[0]?.rating ?? null });
 });
+router.post('/comments', async (req, res, next) => {
+  try {
+    const titleId = Number(req.body?.title_id), content = req.body?.content;
+    if (!Number.isInteger(titleId) || titleId < 1 || titleId > 2147483647 || typeof content !== 'string' || !content.trim() || content.length > 2000) return res.status(400).json({ error: 'Enter a comment up to 2,000 characters.' });
+    const exists = await pool.query('SELECT 1 FROM media WHERE title_id=$1', [titleId]);
+    if (!exists.rowCount) return res.status(404).json({ error: 'Media not found.' });
+    const { rows } = await pool.query(`INSERT INTO media_comment(user_id,title_id,content) VALUES($1,$2,$3)
+      RETURNING comment_id,content,created_at`, [req.user.user_id,titleId,content.trim()]);
+    res.status(201).json({ comment: { ...rows[0], user_id: req.user.user_id, name: req.user.name } });
+  } catch (e) { next(e); }
+});
+router.get('/community', async (req, res, next) => {
+  const offset = Number(req.query.offset || 0);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) return res.status(400).json({ error: 'Invalid pagination.' });
+  try { const { rows } = await pool.query(`SELECT p.*,u.name, m.title AS media_title, c.name AS cast_name, g.name AS genre_name FROM community_post p JOIN users u USING(user_id) LEFT JOIN media m ON m.title_id=p.media_id LEFT JOIN cast_crew c USING(cast_crew_id) LEFT JOIN genre g USING(genre_id) ORDER BY p.created_at DESC,p.post_id DESC LIMIT 21 OFFSET $1`, [offset]); res.json({ posts: rows.slice(0,20), hasMore: rows.length > 20 }); } catch (e) { next(e); }
+});
+router.post('/community', async (req, res, next) => {
+  try {
+    const { title, content, media_id, cast_crew_id, genre_id } = req.body || {};
+    if (typeof title !== 'string' || !title.trim() || title.length > 200 || typeof content !== 'string' || !content.trim() || content.length > 10000) return res.status(400).json({ error: 'Add a title and post content.' });
+    for (const id of [media_id, cast_crew_id, genre_id]) if (id != null && (!Number.isInteger(id) || id < 1 || id > 2147483647)) return res.status(400).json({ error: 'Choose valid tags from the search results.' });
+    const { rows } = await pool.query(`INSERT INTO community_post(user_id,title,content,media_id,cast_crew_id,genre_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [req.user.user_id,title.trim(),content.trim(),media_id||null,cast_crew_id||null,genre_id||null]);
+    res.status(201).json({ post: { ...rows[0], name: req.user.name } });
+  } catch (e) { if (e.code === '23503') return res.status(400).json({ error: 'A selected tag no longer exists. Choose another tag.' }); next(e); }
+});
 router.put("/ratings/:titleId", async (req, res) => {
   if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate titles." });
   const titleId = Number(req.params.titleId), rating = req.body?.rating;

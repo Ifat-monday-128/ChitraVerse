@@ -5,9 +5,9 @@ import BrandWordmark from './brand-wordmark';
 import './menu-drawer.css';
 
 export type MenuItem = { label: string; icon: string; active?: boolean; action: () => void };
-type Props = { close: () => void; home: () => void; items: MenuItem[]; library: MenuItem[]; admin: boolean };
+type Props = { close: () => void; home: () => void; items: MenuItem[]; library: MenuItem[]; admin: boolean; user?: { name: string; role: string | null } | null; profile?: () => void };
 
-export default function MenuDrawer({ close, home, items, library, admin }: Props) {
+export default function MenuDrawer({ close, home, items, library, admin, user, profile }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [closing, setClosing] = useState(false);
   const exiting = useRef(false);
@@ -44,7 +44,7 @@ export default function MenuDrawer({ close, home, items, library, admin }: Props
     <aside className="menu-drawer-panel" onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'drawer-slide-out') finish(); }}>
       <header className="drawer-header"><button className="drawer-brand" type="button" onClick={() => dismiss(home)} aria-label="ChitraVerse home"><BrandWordmark /></button><button className="drawer-close" type="button" onClick={() => dismiss()} aria-label="Close menu">×</button></header>
       <nav className="drawer-navigation" aria-label="Site navigation"><p className="drawer-group-label">MENU</p><div className="drawer-links">{links(items)}</div><p className="drawer-group-label">{admin ? 'ADMINISTRATION' : 'YOUR LIBRARY'}</p><div className="drawer-links">{links(library, items.length)}</div></nav>
-      <footer className="drawer-footer"><span className="drawer-footer-mark" aria-hidden="true" /><span>Your world of cinema.</span></footer>
+      <footer className="drawer-footer"><button className="drawer-profile" type="button" disabled={closing} onClick={() => dismiss(profile)}><span className="drawer-avatar">{user ? user.name.slice(0,2).toUpperCase() : 'CV'}</span><span><strong>{user?.name || 'Sign in'}</strong><small>{user ? user.role === 'admin' ? 'Admin' : 'User' : 'Join ChitraVerse'}</small></span><svg className="drawer-dashboard-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></button></footer>
     </aside>
   </dialog>;
 }

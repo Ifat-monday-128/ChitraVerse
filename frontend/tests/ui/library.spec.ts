@@ -16,7 +16,7 @@ const password = 'UI verification password 123';
 
 test.beforeAll(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`);
-  for (const file of ['schema.sql', 'migrations/001_search_and_sessions.sql', 'migrations/002_homepage_features.sql']) {
+  for (const file of ['schema.sql', 'migrations/001_search_and_sessions.sql', 'migrations/002_homepage_features.sql', 'migrations/003_community_comments.sql']) {
     await pool.query(await readFile(new URL(`../../../server/database/${file}`, import.meta.url), 'utf8'));
   }
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
@@ -25,9 +25,12 @@ test.beforeAll(async () => {
   await pool.query('INSERT INTO series(title_id,first_air_date) VALUES(2,$1)', [date]);
   await pool.query('INSERT INTO homepage_feature(title_id,position) VALUES(1,0)');
   const hash = `scrypt:ui-fixture:${scryptSync(password, 'ui-fixture', 64).toString('hex')}`;
-  for (const name of ['ratings', 'watchlists', 'favorites']) {
+  for (const name of ['ratings', 'watchlists', 'favorites', 'community']) {
     await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'user')", [name, `${name}@example.invalid`, hash]);
   }
+  await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES('Administrator','admin@example.invalid',$1,'admin')", [hash]);
+  await pool.query("INSERT INTO genre(name) VALUES('Drama')");
+  await pool.query("INSERT INTO cast_crew(name) VALUES('Test Performer')");
   server = require('../../../server/src/app').listen(5001, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
 });
@@ -159,5 +162,83 @@ test('favorites persist separately for movies and series; mobile actions fit and
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Open menu' }).click();
   await expect(page.getByRole('button', { name: 'My Watchlists', exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Favorites', exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Favorites', exact: true })).toBeVisible();
+});
+
+
+test('community blogs, repeated media comments and sidebar dashboards', async ({ page }) => {
+  await login(page, 'community');
+  await page.getByRole('button', { name: 'Open profile' }).click();
+  await expect(page.getByRole('dialog', { name: 'Your profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'User dashboard' })).toHaveCount(0);
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.locator('.drawer-profile').click();
+  await expect(page.getByRole('heading', { name: 'User dashboard' })).toBeVisible();
+  await expect(page.locator('.dashboard-card')).toHaveCount(3);
+  await page.screenshot({path:'test-results/dashboard-desktop.png',fullPage:true});
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('dialog', {name:'Main navigation'}).getByRole('button', { name: 'CVcommunity', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'CVcommunity', exact: true })).toBeVisible();
+  await page.getByLabel('Title', {exact:true}).fill('A thoughtful cinema blog');
+  await page.getByLabel('Your story', {exact:true}).fill('A story about cinema and its creators. '.repeat(25));
+  await expect(page.locator('#blog-title-count')).toHaveText('24 / 200 characters');
+  await page.getByLabel('Tag media', {exact:true}).fill('zzznomatchingtitlezzz');
+  await expect(page.getByText('No matches. Try another name.')).toBeVisible();
+  await page.getByLabel('Tag media', {exact:true}).fill('Cinema test movie');
+  await page.getByRole('button', { name: 'Cinema test movie', exact: true }).click();
+  await page.getByLabel('Tag cast / crew', {exact:true}).fill('Test Performer');
+  await page.getByRole('button', { name: 'Test Performer', exact: true }).click();
+  await page.getByLabel('Tag genre').selectOption({label:'Drama'});
+  await page.getByRole('button', { name: 'Publish blog' }).click();
+  await expect(page.getByRole('heading', { name: 'A thoughtful cinema blog' })).toBeVisible();
+  await expect(page.getByText('Your blog is published. Find it in Latest stories.')).toBeVisible();
+  await page.getByRole('button', {name:'Read full story'}).click();
+  await expect(page.getByRole('button', {name:'Show less'})).toHaveAttribute('aria-expanded','true');
+  await page.getByRole('button', {name:'Show less'}).click();
+  await expect(page.getByRole('button', {name:'Read full story'})).toHaveAttribute('aria-expanded','false');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'A thoughtful cinema blog' })).toBeVisible();
+  await page.locator('.community-post').getByRole('button', {name:'Cinema test movie'}).click();
+  for (const id of [1,2]) {
+    await page.goto(`/?title=${id}`);
+    for (const text of ['My first comment','My second comment']) {
+      await page.getByLabel('Your comment', {exact:true}).fill(text);
+      await page.getByRole('button', { name: 'Post comment' }).click();
+      await expect(page.locator('.comment').filter({hasText:text})).toBeVisible();
+      await expect(page.getByText('Comment posted.',{exact:true})).toBeVisible();
+    }
+    await page.reload();
+    await expect(page.locator('.comment')).toHaveCount(2);
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/?view=community');
+  await expect(page.getByRole('heading', {name:'CVcommunity',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.screenshot({path:'test-results/community-mobile.png',fullPage:true});
+  await page.getByRole('button', { name:'Open menu' }).click();
+  await expect(page.locator('.drawer-profile')).toBeVisible();
+  await page.screenshot({path:'test-results/sidebar-mobile.png'});
+  await page.locator('.drawer-profile').click();
+  await expect(page.locator('.dashboard-card')).toHaveCount(3);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.screenshot({path:'test-results/dashboard-mobile.png',fullPage:true});
+});
+
+test('sidebar profile opens admin dashboard while top avatar stays in account controls', async ({page})=>{
+  await page.goto('/');
+  await expect(page.locator('.hero-copy h1')).toHaveText('Cinema test movie');
+  await page.getByRole('button', {name:'Open profile'}).click();
+  await page.getByLabel('Email address', {exact:true}).fill('admin@example.invalid');
+  await page.getByLabel('Password', {exact:true}).fill(password);
+  await page.getByRole('button', {name:'Sign in',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', {name:'Open menu'}).click();
+  await page.locator('.drawer-profile').click();
+  await expect(page.getByRole('heading', {name:'Admin dashboard'})).toBeVisible();
+  await expect(page.getByRole('button', {name:'Manage homepage',exact:true})).toBeVisible();
+  await page.getByRole('button', {name:'Home',exact:true}).click();
+  await page.getByRole('button', {name:'Open profile'}).click();
+  await expect(page.getByRole('dialog', {name:'Your profile'})).toBeVisible();
+  await expect(page.getByRole('heading', {name:'Admin dashboard'})).toHaveCount(0);
 });

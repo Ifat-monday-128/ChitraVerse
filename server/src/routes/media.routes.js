@@ -2,6 +2,18 @@ const express = require("express");
 const mediaController = require("../controllers/media.controller");
 
 const router = express.Router();
+const pool = require('../config/db');
+
+router.get('/:titleId/comments', async (req, res, next) => {
+  try {
+    const id = Number(req.params.titleId);
+    if (!Number.isInteger(id) || id < 1 || id > 2147483647) return res.status(400).json({ error: 'Invalid title ID' });
+    if (!(await pool.query('SELECT 1 FROM media WHERE title_id=$1', [id])).rowCount) return res.status(404).json({ error: 'Media not found.' });
+    const { rows } = await pool.query(`SELECT c.comment_id,c.content,c.created_at,u.user_id,u.name
+      FROM media_comment c JOIN users u USING(user_id) WHERE c.title_id=$1 ORDER BY c.created_at DESC,c.comment_id DESC`, [id]);
+    res.json({ comments: rows });
+  } catch (e) { next(e); }
+});
 
 router.get("/", mediaController.browse);
 router.get("/home", mediaController.getHome);

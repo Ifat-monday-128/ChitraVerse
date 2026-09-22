@@ -18,10 +18,13 @@ import HomeDiscovery from './home-discovery';
 import AuthScreen from './auth-screen';
 import BrandWordmark from './brand-wordmark';
 import MenuDrawer from './menu-drawer';
+import Community from './community';
+import Dashboard from './dashboard';
+import MediaComments from './media-comments';
 import AnimatedDisclosure from './animated-disclosure';
 import { api, ApiError, posterUrl, trailerEmbedUrl, type Media, type Results, type User } from "./api";
 
-type Route = TitleFilters & { view: "home" | "browse" | "search" | "watchlist" | "favorites" | "cast"; listId: number | null; collection: string; q: string; seed: string };
+type Route = TitleFilters & { view: "home" | "browse" | "search" | "watchlist" | "favorites" | "cast" | "community" | "dashboard"; listId: number | null; collection: string; q: string; seed: string };
 const home: Route = { ...emptyFilters, view: "home", listId: null, collection: "all", q: "", seed: "" };
 const newShuffleSeed = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
 const message = (error: unknown) => error instanceof ApiError ? error.message : "Cannot reach the library. Check your connection and try again.";
@@ -139,7 +142,7 @@ export default function Home() {
       setRoute({
         ...readFilters(params),
         sort, seed, listId: readId("list"),
-        view: ["browse", "search", "watchlist", "favorites", "cast"].includes(view || "") ? view as Route["view"] : "home",
+        view: ["browse", "search", "watchlist", "favorites", "cast", "community", "dashboard"].includes(view || "") ? view as Route["view"] : "home",
         type: ["movie", "series"].includes(params.get("type") || "") ? params.get("type")! : "all",
         collection: params.get("collection") === "hollywood" ? "hollywood" : "all", q: (params.get("q") || "").slice(0, 120)
       });
@@ -150,7 +153,7 @@ export default function Home() {
     return () => window.removeEventListener("popstate", read);
   }, []);
   useEffect(() => {
-    if (!ready || ["cast", "watchlist", "favorites"].includes(route.view)) return;
+    if (!ready || ["cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view)) return;
     const controller = new AbortController();
     // Reset data when synchronizing with a new API request, including browser Back.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -207,7 +210,6 @@ export default function Home() {
     try {
       const data = await api<{ user: User }>(`/api/account/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(Object.fromEntries(form)) });
       setUser(data.user); setAccount(false);
-      if (data.user.role === "admin") { go(); setAdminOpen(true); }
     } catch (error) { setAccountError(message(error)); }
     finally { setAccountBusy(false); }
   }
@@ -262,7 +264,7 @@ export default function Home() {
     </section>
     {route.view === "cast" && <div hidden={!isDirectory}><CastDirectory query={route.q} search={q => go({ view: "cast", q })} openPerson={openPerson} /></div>}
     {companyId !== null && personId === null && <section hidden={detailId !== null} className="content-page" key={`company-${companyId}`}><button className="back-button" onClick={back}>← Back</button><ProductionProfile key={companyId} id={companyId} renderItems={titles => <div className="media-grid">{titles.map((item, index) => <Card key={item.title_id} item={item} index={index} open={openTitle} />)}</div>} /></section>}
-    {isDirectory && !["cast", "watchlist", "favorites"].includes(route.view) && <section className="rail-section"><div className="section-heading"><div><p>{isHome ? "FROM YOUR LIBRARY" : <>EXPLORE <BrandWordmark /></>}</p><h2>{isHome ? "Hollywood movies" : heading}</h2></div>
+    {isDirectory && !["cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view) && <section className="rail-section"><div className="section-heading"><div><p>{isHome ? "FROM YOUR LIBRARY" : <>EXPLORE <BrandWordmark /></>}</p><h2>{isHome ? "Hollywood movies" : heading}</h2></div>
       {isHome && items.length > 0 && <button aria-label="View all Hollywood movies" onClick={() => go({ view: "browse", type: "movie", collection: "hollywood" })}>→</button>}</div>
       {!isHome && route.view !== "search" && <AnimatedDisclosure key={route.view} kind="search" label={route.view === 'watchlist' ? 'Search your watchlist' : 'Search movies & series'}><form className="search-form" role="search" onSubmit={(event) => { event.preventDefault(); setRetry((current) => current + 1); }}>
         <label htmlFor="library-search">Search titles or actors</label><div className="search-field"><input id="library-search" type="search" value={route.q} maxLength={120} placeholder="Movie, TV show, actor or actress…" onChange={event => changeSearch(event.target.value)} /><button className="primary-button" type="submit">Search</button></div>
@@ -280,12 +282,15 @@ export default function Home() {
     {personId !== null && detailId === null && externalTitle === null && <section className="content-page" key={`person-${personId}`}><button className="back-button" onClick={back}>← Back</button><PersonProfile key={personId} id={personId} openTitle={openTitle} /></section>}
     {isHome && <HomeDiscovery openTitle={openTitle} openPerson={openPerson} openGenre={id => go({ view: 'search', genre: String(id) })} />}
     {externalTitle !== null && <section className="content-page title-page" key={externalTitle}><button className="back-button" onClick={back}>← Back</button><ExternalTitle reference={externalTitle} openTitle={openTitle} /></section>}
-    {menu && <MenuDrawer close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} items={[
+    {isDirectory && route.view === "community" && <Community key={user?.user_id ?? "guest"} user={user} signIn={()=>setAccount(true)} openTitle={openTitle} openPerson={openPerson} openGenre={id=>go({view:"search",genre:String(id)})} />}
+    {isDirectory && route.view === "dashboard" && <Dashboard user={user} busy={accountBusy} error={accountError} signIn={()=>setAccount(true)} logout={logout} watchlists={()=>go({view:"watchlist"})} favorites={()=>go({view:"favorites"})} community={()=>go({view:"community"})} homepage={()=>setHomepageEditor(true)} activity={()=>setAdminOpen(true)} />}
+    {menu && <MenuDrawer close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} user={user} profile={() => user ? go({view:'dashboard'}) : setAccount(true)} items={[
       { label: 'Home · Hollywood', icon: 'home', active: isHome, action: () => go() },
       { label: 'All movies', icon: 'movies', active: isDirectory && route.view === 'browse' && route.type === 'movie', action: () => go({ view: 'browse', type: 'movie' }) },
       { label: 'TV shows', icon: 'tv', active: isDirectory && route.view === 'browse' && route.type === 'series', action: () => go({ view: 'browse', type: 'series' }) },
       { label: 'Search the library', icon: 'search', active: isDirectory && route.view === 'search', action: () => go({ view: 'search' }) },
       { label: 'Cast & crew', icon: 'people', active: isDirectory && route.view === 'cast', action: () => go({ view: 'cast' }) },
+      { label: 'CVcommunity', icon: 'people', active: isDirectory && route.view === 'community', action: () => go({ view: 'community' }) },
     ]} library={user?.role === 'admin' ? [
       { label: 'Manage homepage', icon: 'edit', action: () => setHomepageEditor(true) },
       { label: 'Users & activity', icon: 'activity', action: () => setAdminOpen(true) },
@@ -302,6 +307,7 @@ export default function Home() {
           setFeaturedItems(current => current.map(item => item.title_id === detail.title_id ? { ...item, ...data } : item));
         }} signIn={() => setAccount(true)} />
         <TrailerPlayer key={detail.title_id} item={detail} autoPlay={trailerTitleId === detail.title_id} />
+        <MediaComments key={`comments-${detail.title_id}-${user?.user_id ?? "guest"}`} id={detail.title_id} user={user} signIn={()=>setAccount(true)} />
         {!!detail.cast_crew?.length && <><h3>Cast &amp; crew</h3><ul className="cast-grid">{detail.cast_crew.map((person, index) => <li key={`${person.cast_crew_id}-${person.role_type}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
           <button className="cast-card" onClick={() => openPerson(person.cast_crew_id)}><div className="cast-photo"><PersonPhoto name={person.name} photo={person.photo} /></div><strong>{person.name}</strong><small>{person.role_type}</small><span>View profile →</span></button></li>)}</ul></>}
         {!!detail.production_companies?.length && <ProductionCredits companies={detail.production_companies} openCompany={openCompany} />}
@@ -314,8 +320,7 @@ export default function Home() {
     {account && !user && <AuthScreen register={register} busy={accountBusy} error={accountError} close={() => setAccount(false)} toggleMode={() => { setRegister(!register); setAccountError(""); }} submit={authenticate} />}
     {account && user && <Dialog title="Your profile" close={() => setAccount(false)}>
       <p className="eyebrow">YOUR PROFILE</p><h2>{user.name}</h2><p>{user.email}</p><p>Role: {user.role || "Not assigned"}</p>
-        {user.role === 'admin' && <button className="primary-button" onClick={() => { setAccount(false); setHomepageEditor(true); }}>Manage homepage</button>}
-        <div className="detail-actions">{user.role === "admin" ? <button className="primary-button" onClick={() => { setAccount(false); setDetailId(null); setAdminOpen(true); }}>Users &amp; activity</button> : <button className="primary-button" onClick={() => { setAccount(false); setDetailId(null); go({ view: "watchlist" }); }}>My Watchlists</button>}{user.role !== 'admin' && <button className="secondary-button" onClick={() => { setAccount(false); go({ view: 'favorites' }); }}>Favorites</button>}<button className="secondary-button" disabled={accountBusy} onClick={logout}>Sign out</button></div>
+        <div className="detail-actions"><button className="secondary-button" disabled={accountBusy} onClick={logout}>Sign out</button></div>
       {accountError && <p className="message error" role="alert">{accountError}</p>}
     </Dialog>}
   </main>;

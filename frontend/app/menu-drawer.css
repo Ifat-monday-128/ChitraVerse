@@ -16,6 +16,8 @@
 .drawer-link:is(:hover, :focus-visible, .is-active) .drawer-link-arrow { opacity: .8; transform: translateX(0); }
 .drawer-footer { display: flex; align-items: center; gap: 10px; padding: 24px 32px; border-top: 1px solid #ffffff09; color: #8e969d; font-size: 11px; }
 .drawer-footer-mark { width: 5px; height: 5px; border-radius: 50%; background: #d5bb75; box-shadow: 0 0 12px #d5bb7538; }
+.drawer-profile { display:flex; align-items:center; gap:10px; width:100%; border:0; background:none; color:#f0e5c7; text-align:left; padding:0; }
+.drawer-profile small { display:block; color:#8e969d; margin-top:2px; }.drawer-avatar { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:#d86bab; color:white; font-size:11px; }
 .drawer-icon { position: relative; display: block; flex: 0 0 20px; width: 20px; height: 20px; color: inherit; opacity: .85; }
 .drawer-icon::before, .drawer-icon::after { content: ''; position: absolute; box-sizing: border-box; }
 .drawer-icon-home::before { width: 14px; height: 13px; left: 3px; top: 6px; border: 1.5px solid currentColor; border-top: 0; border-radius: 2px; }
@@ -43,3 +45,4 @@
 @keyframes drawer-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
 @media (max-width: 380px) { .drawer-header { padding-inline: 19px; } .drawer-brand { font-size: 21px; } }
 @media (prefers-reduced-motion: reduce) { .menu-drawer *, .menu-drawer::backdrop { animation: none !important; transition: none !important; } }
+.drawer-footer{padding:12px 16px;background:#111316}.drawer-profile{padding:12px 2px;min-height:56px;border-radius:8px;font-size:15px;color:#f3f3f3}.drawer-profile:hover{background:#ffffff08}.drawer-profile:focus-visible{outline:2px solid #d5bb75;outline-offset:4px}.drawer-profile strong{font-weight:500}.drawer-profile small{font-size:12px}.drawer-dashboard-icon{margin-left:auto;color:#aaa;flex-shrink:0}

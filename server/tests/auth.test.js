@@ -71,12 +71,24 @@ test("missing and malformed fields return 400; incorrect credentials return 401"
 
 test("each database role can log in then log out; replaying the old cookie fails", async () => {
   for (const role of roles) {
-    const login = await request("/api/account/login", { body: { email: ` ${role.toUpperCase()}@EXAMPLE.INVALID `, password, role: "forged-role" } });
+    const previousNodeEnv = process.env.NODE_ENV;
+    if (role === "user") process.env.NODE_ENV = "production";
+    let login;
+    try {
+      login = await request("/api/account/login", { body: { email: ` ${role.toUpperCase()}@EXAMPLE.INVALID `, password, role: "forged-role" } });
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
     assert.equal(login.status, 200);
     assert.equal(login.body.user.role, role);
-    assert.deepEqual(Object.keys(login.body.user).sort(), ["email", "name", "role", "user_id"]);
+    assert.deepEqual(Object.keys(login.body.user).sort(), ["avatar", "email", "name", "role", "user_id"]);
     assert.match(login.setCookie, /HttpOnly/i);
-    assert.match(login.setCookie, /SameSite=Lax/i);
+    if (role === "user") {
+      assert.match(login.setCookie, /Secure/i);
+      assert.match(login.setCookie, /SameSite=None/i);
+      assert.match(login.setCookie, /Partitioned/i);
+    } else assert.match(login.setCookie, /SameSite=Lax/i);
     assert.equal(login.headers.get("cache-control"), "no-store");
     const cookie = login.cookie;
     assert.equal((await request("/api/account/watchlist", { cookie })).status, role === "admin" ? 403 : 200);

@@ -4,6 +4,18 @@ const mediaController = require("../controllers/media.controller");
 const router = express.Router();
 const pool = require('../config/db');
 
+// Published stories are readable by everyone; publishing stays authenticated.
+router.get('/community', async (req, res) => {
+  const offset = Number(req.query.offset || 0);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) return res.status(400).json({ error: 'Invalid pagination.' });
+  const { rows } = await pool.query(`SELECT p.post_id,p.title,p.content,p.created_at,p.media_id,p.cast_crew_id,p.genre_id,u.name,
+    m.title AS media_title,c.name AS cast_name,g.name AS genre_name
+    FROM community_post p JOIN users u USING(user_id) LEFT JOIN media m ON m.title_id=p.media_id
+    LEFT JOIN cast_crew c USING(cast_crew_id) LEFT JOIN genre g USING(genre_id)
+    ORDER BY p.created_at DESC,p.post_id DESC LIMIT 21 OFFSET $1`, [offset]);
+  res.json({ posts: rows.slice(0,20), hasMore: rows.length > 20 });
+});
+
 router.get('/:titleId/comments', async (req, res, next) => {
   try {
     const id = Number(req.params.titleId);

@@ -6,7 +6,16 @@ const { createJwt, verifyJwt, lifetimeSeconds } = require("../utils/jwt");
 const scrypt = promisify(scryptCallback);
 const router = express.Router();
 const cookieName = "chitraverse_session";
-const cookieOptions = { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" };
+function cookieOptions() {
+  const production = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    sameSite: production ? "none" : "lax",
+    secure: production,
+    ...(production ? { partitioned: true } : {}),
+    path: "/",
+  };
+}
 const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 
 // Keep cookie parsing in one place for both authentication and logout.
@@ -16,7 +25,7 @@ function sessionToken(req) {
 }
 
 function publicUser(user) {
-  return { user_id: user.user_id, name: user.name, email: user.email, role: user.role };
+  return { user_id: user.user_id, name: user.name, email: user.email, role: user.role, avatar: user.avatar || null };
 }
 
 async function currentUser(req) {
@@ -46,7 +55,7 @@ async function createSession(req, res, user) {
   } finally {
     client.release();
   }
-  res.cookie(cookieName, token, { ...cookieOptions, maxAge: lifetimeSeconds * 1000 });
+  res.cookie(cookieName, token, { ...cookieOptions(), maxAge: lifetimeSeconds * 1000 });
   return res.json({ user: publicUser(user) });
 }
 
@@ -66,7 +75,8 @@ router.use((req, res, next) => { res.set("Cache-Control", "no-store"); next(); }
 router.get("/me", async (req, res) => {
   const user = await currentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in to view your account." });
-  return res.json({ user });
+  const { rows } = await pool.query('SELECT avatar FROM users WHERE user_id=$1', [user.user_id]);
+  return res.json({ user: { ...user, avatar: rows[0]?.avatar || null } });
 });
 router.post("/register", throttle, async (req, res) => {
   const { name, email, password } = req.body || {};
@@ -92,7 +102,7 @@ router.post("/login", throttle, async (req, res) => {
     || typeof password !== "string" || !password.trim() || password.length > 128) {
     return res.status(400).json({ error: "Enter your email and password." });
   }
-  const { rows } = await pool.query("SELECT user_id,name,email,password_hash,role FROM users WHERE email=$1", [email.trim().toLowerCase()]);
+  const { rows } = await pool.query("SELECT user_id,name,email,password_hash,role,avatar FROM users WHERE email=$1", [email.trim().toLowerCase()]);
   const user = rows[0];
   const [format, salt, stored] = (user?.password_hash || "").split(":");
   // Perform a password derivation even for an unknown account.
@@ -107,7 +117,7 @@ router.post("/login", throttle, async (req, res) => {
 router.post("/logout", async (req, res) => {
   const token = sessionToken(req);
   if (token) await pool.query("DELETE FROM user_session WHERE token_hash=$1", [hashToken(token)]);
-  res.clearCookie(cookieName, cookieOptions);
+  res.clearCookie(cookieName, cookieOptions());
   res.json({ user: null });
 });
 
@@ -116,6 +126,9 @@ router.use(async (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: "Sign in to continue." });
   next();
 });
+router.put('/password', throttle);
+router.use(require('./profile.routes'));
+router.use(require('./admin-dashboard.routes'));
 router.get("/admin/users", async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin access required." });
   const { rows } = await pool.query(`SELECT u.user_id,u.name,u.email,u.role,u.created_at,

@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 const { promisify } = require("node:util");
 const { randomBytes, scryptSync, createHash } = require("node:crypto");
 require("../src/config/env");
@@ -83,10 +83,72 @@ test('community persists real tags, validates references and identifies authors 
   assert.equal((await request('/api/account/community',{body})).status,401);
   assert.equal((await request('/api/account/community',{cookie,body})).status,201);
   const result=await request('/api/account/community',{cookie});
+  const publicFeed = await request('/api/media/community');
+  assert.equal(publicFeed.status, 200);
+  assert.equal(publicFeed.body.posts[0].title, body.title);
+  assert.equal(publicFeed.body.posts[0].name, 'user');
+  assert.equal(publicFeed.body.posts[0].email, undefined);
+  assert.equal(publicFeed.body.posts[0].password_hash, undefined);
+  assert.equal((await request('/api/media/community?offset=-1')).status, 400);
+  assert.equal((await request('/api/media/community?offset=100')).body.posts.length, 0);
   assert.equal(result.body.posts[0].name,'user');assert.equal(result.body.posts[0].media_title,'Tagged movie');assert.equal(result.body.posts[0].cast_name,'Tagged person');assert.equal(result.body.posts[0].genre_name,'Drama');
   for (const changes of [{title:''},{content:' '},{media_id:'1'},{genre_id:-1},{cast_crew_id:2147483647}]) assert.equal((await request('/api/account/community',{cookie,body:{...body,...changes}})).status,400);
   assert.equal((await request('/api/account/community',{cookie,body:{title:'No tags',content:'Also supported'}})).status,201);
   await request('/api/account/logout',{cookie,method:'POST'});
   assert.equal((await request('/api/account/community',{cookie,body})).status,401);
+});
+
+test('server bootstraps missing database migrations before comment requests', async () => {
+  const schema = `chitraverse_bootstrap_${process.pid}_${Date.now()}`;
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  await pool.query(`SET search_path TO ${schema},public`);
+  await pool.query(await fs.readFile(path.resolve(__dirname, '../database/schema.sql'), 'utf8'));
+  const salt = randomBytes(16).toString('hex');
+  const hash = `scrypt:${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
+  await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)", ['bootstrap-user', 'bootstrap@example.invalid', hash, 'user']);
+  const mediaId = (await pool.query("INSERT INTO media(title) VALUES('Fresh title') RETURNING title_id")).rows[0].title_id;
+  const child = spawn(process.execPath, ['src/server.js'], {
+    cwd: path.resolve(__dirname, '..'),
+    env: { ...process.env, PORT: '6111', PGOPTIONS: `-c search_path=${schema},public` },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk.toString(); });
+  child.stderr.on('data', chunk => { output += chunk.toString(); });
+
+  const started = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('server did not start')), 20000);
+    child.once('exit', (code) => reject(new Error(`server exited early with code ${code}\n${output}`)));
+    const check = setInterval(() => {
+      if (output.includes('ChitraVerse API running at http://localhost:6111')) {
+        clearInterval(check);
+        clearTimeout(timer);
+        resolve();
+      }
+    }, 100);
+  });
+
+  try {
+    const login = await fetch('http://127.0.0.1:6111/api/account/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'bootstrap@example.invalid', password }),
+    });
+    const loginBody = await login.json();
+    assert.equal(login.status, 200, `login failed: ${JSON.stringify(loginBody)}`);
+    const cookie = login.headers.get('set-cookie')?.split(';')[0];
+    const comment = await fetch(`http://127.0.0.1:6111/api/account/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+      body: JSON.stringify({ title_id: mediaId, content: 'Bootstrapped comment' }),
+    });
+    const commentBody = await comment.json();
+    assert.equal(comment.status, 201, `comment failed: ${JSON.stringify(commentBody)}`);
+    assert.equal(commentBody.comment.content, 'Bootstrapped comment');
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise((resolve) => child.once('exit', resolve));
+    await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+  }
 });
 

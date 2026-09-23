@@ -359,7 +359,7 @@ The build writes frontend artifacts under `frontend/dist/`. The frontend also ex
 
 The frontend contains Sites/Cloudflare worker configuration in `frontend/.openai/hosting.json`, `vite.config.ts`, and `worker/`. Building does not publish the site, deploy Express/PostgreSQL, or apply migrations. Complete hosting requires a reachable API and PostgreSQL deployment as well as the frontend.
 
-Before deployment, apply migrations, set a strong `JWT_SECRET`, set `NEXT_PUBLIC_API_URL` to the public HTTPS API address, configure `FRONTEND_ORIGINS`, and set `NODE_ENV=production` for secure API cookies. Keep frontend/API on the same site for the current SameSite=Lax cookie behavior; CORS alone does not enable cross-site authenticated fetches. Accounts use signed, PostgreSQL-revocable JWT sessions rather than the frontend starter's optional ChatGPT identity helpers.
+Before deployment, apply migrations, set a strong `JWT_SECRET`, set `NEXT_PUBLIC_API_URL` to the public HTTPS API address, configure `FRONTEND_ORIGINS`, and set `NODE_ENV=production`. Production sessions use secure, partitioned `SameSite=None` cookies so a separately hosted HTTPS frontend can authenticate with the API. Local development keeps `SameSite=Lax` and automatically uses the browser's current hostname for the default API address. Accounts use signed, PostgreSQL-revocable JWT sessions rather than the frontend starter's optional ChatGPT identity helpers.
 
 ## Troubleshooting
 

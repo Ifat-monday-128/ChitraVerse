@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError, posterUrl, type Company, type Media, type Results } from './api';
 import { PersonPhoto } from './person-profile';
 import { TitleFilterPanel, PeopleFilterPanel, emptyFilters, emptyPeopleFilters, filterParams, sortNames } from './search-filters';
@@ -23,8 +23,38 @@ function useDirectory<T>(path: string) {
 }
 
 function Pagination({ page, total, hasMore, change }: { page: number; total: number; hasMore: boolean; change: (page: number) => void }) {
+  const totalPages = Math.max(1, Math.ceil(total / 36));
   if (total <= 36) return null;
-  return <nav className="directory-pagination" aria-label="Results pages"><button className="secondary-button" disabled={page === 0} onClick={() => change(page - 1)}>← Previous</button><span>Page {page + 1} of {Math.ceil(total / 36)}</span><button className="primary-button" disabled={!hasMore} onClick={() => change(page + 1)}>Next →</button></nav>;
+
+  const visible = new Set<number>([0, page, totalPages - 1]);
+  for (let i = page - 2; i <= page + 2; i++) {
+    if (i > 0 && i < totalPages - 1) visible.add(i);
+  }
+  const pages = Array.from(visible).sort((left, right) => left - right);
+
+  return <nav className="directory-pagination theme-pagination" aria-label="Results pages">
+    <button className="pagination-arrow" disabled={page === 0} onClick={() => change(page - 1)} aria-label="Previous page">←</button>
+    <div className="pagination-pages" aria-label="Page numbers">
+      {pages.map((pageNumber, index) => {
+        const previous = pages[index - 1];
+        const currentPage = pageNumber + 1;
+        const showDots = previous !== undefined && pageNumber - previous > 1;
+        return <Fragment key={`${pageNumber}-${index}`}>
+          {showDots && <span className="pagination-ellipsis" aria-hidden="true">…</span>}
+          <button
+            className={pageNumber === page ? 'pagination-page is-active' : 'pagination-page'}
+            type="button"
+            aria-current={pageNumber === page ? 'page' : undefined}
+            disabled={pageNumber === page}
+            onClick={() => change(pageNumber)}
+          >
+            {currentPage}
+          </button>
+        </Fragment>;
+      })}
+    </div>
+    <button className="pagination-arrow" disabled={!hasMore && page >= totalPages - 1} onClick={() => change(page + 1)} aria-label="Next page">→</button>
+  </nav>;
 }
 
 export function CastDirectory({ query, search, openPerson }: { query: string; search: (query: string) => void; openPerson: (id: number) => void }) {

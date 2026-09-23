@@ -242,3 +242,17 @@ test('sidebar profile opens admin dashboard while top avatar stays in account co
   await expect(page.getByRole('dialog', {name:'Your profile'})).toBeVisible();
   await expect(page.getByRole('heading', {name:'Admin dashboard'})).toHaveCount(0);
 });
+
+test('a rejected protected request clears stale account UI and asks for a fresh sign in', async ({page}) => {
+  await login(page, 'favorites');
+  await page.route('**/api/account/favorites/1', route => route.fulfill({
+    status: 401,
+    contentType: 'application/json',
+    body: JSON.stringify({error:'Sign in to continue.'}),
+  }));
+  await page.goto('/?title=1');
+  await expect(page.getByRole('dialog', {name:'Welcome back.'})).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('session has expired or was replaced');
+  await expect(page.getByRole('button', {name:'Open profile'})).toHaveText('CV');
+  await expect(page.getByText('Sign in to continue.', {exact:true})).toHaveCount(0);
+});

@@ -95,3 +95,23 @@
 @media (max-width: 760px) { .home-discovery { padding: 0 6% 30px; } .discovery-section { padding: 32px 0; } .discovery-tag { display: none; } .box-office-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; } .box-office-poster { flex-basis: 100px; width: 100px; } .box-office-film h3 { font-size: 25px; } .box-office-earnings > strong { font-size: 52px; } .box-office-share { gap: 20px; } .discovery-heading { margin-bottom: 26px; gap: 14px; } .discovery-heading p:not(.eyebrow) { font-size: 12px; } .birthday-rail { grid-auto-columns: calc((100% - 40px) / 3); gap: 20px; } .birthday-controls { gap: 6px; } .birthday-controls button { width: 38px; height: 38px; } }
 @media (max-width: 450px) { .birthday-rail { grid-auto-columns: 42%; } .box-office-chart-heading { flex-direction: column; align-items: flex-start; gap: 6px; } .box-office-row { gap: 10px; padding: 13px 8px; } .chart-label { gap: 8px; font-size: 12px; } .discovery-heading h2 { font-size: 28px; } .birthday-section .discovery-heading { align-items: flex-end; } }
 @media (prefers-reduced-motion: reduce) { .home-discovery *, .home-discovery *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Reuse the movie reel's linear, seamless loop for today's discoveries. */
+.birthday-marquee-track { list-style: none; padding: 10px 0 24px; margin: 0; }
+.birthday-marquee-track > li { flex: 0 0 clamp(140px, 13vw, 200px); width: clamp(140px, 13vw, 200px); }
+@media (max-width: 760px) {
+  .discovery-marquee .media-card { flex-basis: 65vw; width: 65vw; }
+  .birthday-marquee-track > li { flex-basis: 36vw; width: 36vw; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .discovery-marquee, .birthday-marquee { overflow-x: auto; }
+}
+
+.interests-marquee-track { list-style: none; padding: 8px 0 24px; margin: 0; }
+.interests-marquee-track > li { flex: 0 0 clamp(220px, 21vw, 320px); width: clamp(220px, 21vw, 320px); }
+@media (max-width: 760px) {
+  .interests-marquee-track > li { flex-basis: 65vw; width: 65vw; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .interests-marquee { overflow-x: auto; }
+}

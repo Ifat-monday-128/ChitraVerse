@@ -8,7 +8,7 @@ export type Media = {
   production_companies?: Company[];
   seasons?: { season_id: number; season_number: number; total_episode: number }[];
 };
-export type User = { user_id: number; name: string; email: string; role: string | null };
+export type User = { user_id: number; name: string; email: string; role: string | null; avatar?: string | null; created_at?: string };
 export type Company = { company_id: number; name: string; country: string | null; logo: string | null };
 export type Person = {
   cast_crew_id: number; name: string; photo: string | null; biography: string | null;
@@ -20,8 +20,19 @@ export type Results = { items: Media[]; total: number; hasMore: boolean };
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
+
+export const sessionExpiredEvent = "chitraverse:session-expired";
+
+function apiBase() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  // Keep local frontend and API requests on the same hostname. Mixing
+  // localhost and 127.0.0.1 makes browsers treat the session as cross-site.
+  if (typeof window !== "undefined") return `${window.location.protocol}//${window.location.hostname}:5000`;
+  return "http://localhost:5000";
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const base = apiBase();
   const response = await fetch(base.replace(/\/$/, "") + path, {
     ...options, credentials: "include",
     signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
@@ -30,6 +41,9 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const data: unknown = await response.json();
   if (!response.ok) {
     const detail = data && typeof data === "object" && "error" in data ? String(data.error) : "The request could not be completed.";
+    if (response.status === 401 && path.startsWith("/api/account/") && !["/api/account/me", "/api/account/login", "/api/account/register"].includes(path) && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(sessionExpiredEvent));
+    }
     throw new ApiError(detail, response.status);
   }
   return data as T;

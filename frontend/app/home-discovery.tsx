@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { api, type Media } from './api';
 import { PersonPhoto } from './person-profile';
 import './home-discovery.css';
 import PopularInterests from './popular-interests';
 import Card from './media-card';
+import useMarqueeSpeed from './use-marquee-speed';
 
 type BoxMovie = Media & { box_office_gross: string; budget: string | null };
 type Birthday = { cast_crew_id: number; name: string; photo: string | null; date_of_birth: string; roles: string[] };
@@ -58,12 +59,12 @@ function BoxOffice({ openTitle }: { openTitle: (id: number) => void }) {
 }
 
 function BornToday({ openPerson }: { openPerson: (id: number) => void }) {
+  const birthdayTrack = useMarqueeSpeed<HTMLUListElement>();
   const [date, setDate] = useState('');
   const [data, setData] = useState<Birthdays | null>(null);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
-  const rail = useRef<HTMLUListElement>(null);
-  const [canScroll, setCanScroll] = useState({ left: false, right: false });
+  const current = !error && data?.date === date ? data : null;
   useEffect(() => {
     const update = () => setDate(localDate());
     update();
@@ -79,32 +80,18 @@ function BornToday({ openPerson }: { openPerson: (id: number) => void }) {
       .catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   }, [date, retry]);
-  useEffect(() => {
-    const element = rail.current;
-    if (!element) return;
-    const update = () => setCanScroll({ left: element.scrollLeft > 2, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 2 });
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    element.addEventListener('scroll', update, { passive: true });
-    return () => { observer.disconnect(); element.removeEventListener('scroll', update); };
-  }, [data, date, error]);
-  function scroll(direction: number) {
-    const element = rail.current;
-    if (element) element.scrollBy({ left: direction * element.clientWidth * 0.8, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
-  }
   const dateLabel = date ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)) : '';
-  const current = data?.date === date ? data : null;
   return <section className="discovery-section birthday-section" aria-labelledby="birthday-heading">
-    <div className="discovery-heading"><div><p className="eyebrow">A LITTLE SPOTLIGHT</p><h2 id="birthday-heading">Born <span>today.</span></h2><p>{dateLabel ? `Celebrating the people behind the screen · ${dateLabel}` : 'Celebrating the people behind the screen'}</p></div><div className="birthday-controls"><button aria-label="Previous birthday portraits" aria-controls="birthday-rail" disabled={!canScroll.left} onClick={() => scroll(-1)}>←</button><button aria-label="Next birthday portraits" aria-controls="birthday-rail" disabled={!canScroll.right} onClick={() => scroll(1)}>→</button></div></div>
+    <div className="discovery-heading"><div><p className="eyebrow">A LITTLE SPOTLIGHT</p><h2 id="birthday-heading">Born <span>today.</span></h2><p>{dateLabel ? `Celebrating the people behind the screen · ${dateLabel}` : 'Celebrating the people behind the screen'}</p></div></div>
     {error ? <div className="discovery-message" role="alert">Today’s birthdays couldn’t be loaded. <button onClick={() => { setError(false); setRetry(value => value + 1); }}>Try again</button></div>
       : !current ? <p className="discovery-message" role="status">Finding today’s birthdays…</p>
       : !current.items.length ? <p className="discovery-message">No birthdays recorded for {dateLabel} in your library. Check back tomorrow.</p>
-      : <ul className="birthday-rail" id="birthday-rail" ref={rail}>{current.items.map(person => <li key={person.cast_crew_id}><button className="birthday-card" onClick={() => openPerson(person.cast_crew_id)} aria-label={`View ${person.name}, born ${person.date_of_birth.slice(0, 4)}`}><span className="birthday-portrait"><PersonPhoto name={person.name} photo={person.photo} /><span className="birthday-profile-arrow" aria-hidden="true">↗</span></span><strong>{person.name}</strong><span className="birthday-role">{person.roles.join(' · ') || 'Cast & crew'}</span><small>Born {person.date_of_birth.slice(0, 4)}</small></button></li>)}</ul>}
+      : <div className="home-marquee birthday-marquee"><ul className="home-marquee-track birthday-marquee-track" id="birthday-rail" ref={birthdayTrack}>{[...current.items, ...current.items].map((person, index) => <li key={`${person.cast_crew_id}-${index}`}><button className="birthday-card" onClick={() => openPerson(person.cast_crew_id)} aria-label={`View ${person.name}, born ${person.date_of_birth.slice(0, 4)}`}><span className="birthday-portrait"><PersonPhoto name={person.name} photo={person.photo} /><span className="birthday-profile-arrow" aria-hidden="true">↗</span></span><strong>{person.name}</strong><span className="birthday-role">{person.roles.join(' · ') || 'Cast & crew'}</span><small>Born {person.date_of_birth.slice(0, 4)}</small></button></li>)}</ul></div>}
   </section>;
 }
 
 export function ReleasedToday({ openTitle }: { openTitle: (id: number) => void }) {
+  const releasedTrack = useMarqueeSpeed<HTMLDivElement>();
   const [date, setDate] = useState('');
   const [data, setData] = useState<{ date: string; items: Media[] } | null>(null);
   const [error, setError] = useState(false);
@@ -124,14 +111,14 @@ export function ReleasedToday({ openTitle }: { openTitle: (id: number) => void }
       .catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   }, [date, retry]);
-  const current = data?.date === date ? data : null;
+  const current = !error && data?.date === date ? data : null;
   const dateLabel = date ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)) : '';
   return <section className="discovery-section released-section" aria-labelledby="released-heading">
     <div className="discovery-heading"><div><p className="eyebrow">ON THIS DAY IN CINEMA</p><h2 id="released-heading">Released <span>Today</span></h2><p>Movies and series that premiered on this day{dateLabel ? ` · ${dateLabel}` : ''}</p></div></div>
     {error ? <div className="discovery-message" role="alert">Today’s releases couldn’t be loaded. <button onClick={() => { setError(false); setData(null); setRetry(value => value + 1); }}>Try again</button></div>
       : !current ? <p className="discovery-message" role="status">Finding today’s releases…</p>
       : !current.items.length ? <p className="discovery-message">No releases recorded for {dateLabel} in your library. Check back tomorrow.</p>
-      : <div className="media-rail" aria-label="Released Today titles">{current.items.map((item, index) => <Card key={`${item.media_type}-${item.title_id}`} item={item} index={index} open={openTitle} />)}</div>}
+      : <div className="media-rail home-marquee discovery-marquee" id="released-rail" aria-label="Released Today titles"><div className="home-marquee-track" ref={releasedTrack}>{[...current.items, ...current.items].map((item, index) => <Card key={`${item.media_type}-${item.title_id}-${index}`} item={item} index={index} open={openTitle} />)}</div></div>}
   </section>;
 }
 

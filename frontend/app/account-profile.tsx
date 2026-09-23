@@ -56,7 +56,6 @@ export default function AccountProfile(props: AccountProfileProps) {
   useEffect(() => {
     if (tab !== 'Activity') return;
     const controller = new AbortController();
-    setActivityLoading(true); setActivityError('');
     api<{ items: Activity[]; hasMore: boolean }>('/api/account/activity', { signal: controller.signal }).then(data => {
       if (!controller.signal.aborted) { setActivities(data.items); setHasMore(data.hasMore); }
     }).catch(e => { if (!controller.signal.aborted) setActivityError(errorMessage(e)); }).finally(() => { if (!controller.signal.aborted) setActivityLoading(false); });
@@ -83,7 +82,7 @@ export default function AccountProfile(props: AccountProfileProps) {
     catch (e) { setError(errorMessage(e)); } finally { setSaving(false); }
   }
   const displayedUser = profile?.user || props.user;
-  function navigate(next: Tab) { setTab(next); setSuccess(''); if (profile) setError(''); }
+  function navigate(next: Tab) { if (next === 'Activity' && tab !== next) { setActivityLoading(true); setActivityError(''); } setTab(next); setSuccess(''); if (profile) setError(''); }
   function portrait(photo: string | null | undefined, large = false) { return <span className={`account-portrait ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${displayedUser.name}'s profile`} /> : <span>{displayedUser.name.slice(0, 2).toUpperCase()}</span>}</span>; }
   return <section className="account-hub" aria-label="Account dashboard">
     <aside className="account-sidebar">
@@ -95,12 +94,12 @@ export default function AccountProfile(props: AccountProfileProps) {
       <button className="account-signout" onClick={props.logout} disabled={props.busy || saving}>{props.busy ? 'Signing out…' : 'Sign out'}<span aria-hidden="true">↗</span></button>
     </aside>
     <div className="account-main">
-      <header className="account-page-heading"><div><p className="eyebrow">YOUR CHITRAVERSE</p><h1>{tab === 'Overview' ? 'A space for your stories.' : tab === 'My account' ? 'Make it yours.' : tab === 'Activity' ? 'Your cinema journey.' : 'Keep your account secure.'}</h1><p>{tab === 'Overview' ? `Welcome back, ${displayedUser.name}. Your next great watch starts here.` : tab === 'My account' ? 'A familiar face. A name that feels like you.' : tab === 'Activity' ? 'Your ratings, saved titles, comments, and published stories.' : 'Manage your password and protect your personal space.'}</p></div><span className="account-member-since">{displayedUser.created_at ? `Member since ${dateLabel(displayedUser.created_at)}` : 'CHITRAVERSE MEMBER'}</span></header>
+      <header className="account-page-heading"><div><p className="eyebrow">YOUR CHITRAVERSE</p><h1>{tab === 'Overview' ? 'Your next chapter.' : tab === 'My account' ? 'Make it yours.' : tab === 'Activity' ? 'Your cinema journey.' : 'Keep your account secure.'}</h1><p>{tab === 'Overview' ? `Welcome back, ${displayedUser.name}. Your next great watch starts here.` : tab === 'My account' ? 'A familiar face. A name that feels like you.' : tab === 'Activity' ? 'Your ratings, saved titles, comments, and published stories.' : 'Manage your password and protect your personal space.'}</p></div><span className="account-member-since">{displayedUser.created_at ? `Member since ${dateLabel(displayedUser.created_at)}` : 'CHITRAVERSE MEMBER'}</span></header>
       {(error || props.error) && <div className="account-notice error" role="alert">{error || props.error}{!profile && <button className="text-button" onClick={() => setRetry(n => n + 1)}>Try again</button>}</div>}
       {success && <p className="account-notice success" role="status">{success}</p>}
       {!profile ? (!error ? <p className="account-loading" role="status">Loading your personal space…</p> : null) : <>
       {tab === 'Overview' && <>
-        <div className="account-welcome"><div><span className="eyebrow">THE PERSON BEHIND THE PLAYLIST</span><h2>Your taste. Your collection.</h2><p>Keep the films you love close, and the ones you have yet to discover closer.</p><button className="primary-button" onClick={() => navigate('My account')}>Edit profile <span aria-hidden="true">↗</span></button></div>{portrait(displayedUser.avatar, true)}</div>
+        <div className="account-welcome"><div className="account-hero-art" aria-hidden="true">{profile.favorites.slice(0,3).map(item => posterUrl(item.poster) ? <img key={item.title_id} src={posterUrl(item.poster)} alt="" /> : null)}</div><div className="account-hero-copy"><span className="eyebrow">YOUR WORLD OF CINEMA</span><h2>Good stories stay with you.</h2><p>Keep the films you love close, and the ones you have yet to discover closer.</p><div className="account-hero-actions"><button className="primary-button" onClick={admin ? props.homepage : props.watchlists}>{admin ? 'Manage homepage' : 'My watchlists'} <span aria-hidden="true">&#8599;</span></button><button className="secondary-button" onClick={() => navigate('My account')}>Manage profile</button></div></div></div>
         <div className="account-stats">{Object.entries(profile?.counts || {}).map(([key, value]) => <button key={key} onClick={() => key === 'favorites' ? props.favorites() : key === 'playlists' ? props.watchlists() : navigate('Activity')} disabled={admin && (key === 'favorites' || key === 'playlists')}><strong>{value.toLocaleString()}</strong><span>{key}</span></button>)}</div>
         <div className="account-quick-actions"><button onClick={() => navigate('My account')}><span aria-hidden="true">◎</span><div><strong>My account</strong><small>Update your name and profile photo</small></div><b aria-hidden="true">↗</b></button><button onClick={() => navigate('Security')}><span aria-hidden="true">◇</span><div><strong>Password & security</strong><small>A little peace of mind for your account</small></div><b aria-hidden="true">↗</b></button></div>
         {admin ? <div className="account-quick-actions"><button onClick={props.homepage}>Manage homepage <b>↗</b></button><button onClick={props.activity}>Users & activity <b>↗</b></button></div> : <>

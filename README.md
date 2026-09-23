@@ -254,7 +254,22 @@ Signed-in viewers can create, rename, and delete multiple named watchlists from 
 
 The homepage discovery order is Popular Interests, Box Office, **Released Today**, then Born Today. Released Today queries existing movie release dates and series first-air dates by month/day, across historical years, excluding dates later than the requested day. The UI follows the visitor's local calendar, updates after midnight, and supports loading, retry, and empty states. Dates are validated, including leap days; no provider API or new table is used.
 
-### Ratings and admin activity
+### Dashboard administration
+
+The dashboards use a dark, cinema-inspired interface with red accents. The viewer overview includes a poster-backed personal hero, a horizontal favorites shelf, watchlists, activity, profile editing, and password settings. Administrator tools live in a separate workspace:
+
+- **Catalog**: search existing records; add movies or series; edit titles, synopses, languages, release/first-air dates, movie runtimes, posters, and trailers. Imported TMDB scores and viewer ratings are not editable. Type cannot be changed after creation. Poster URLs must use HTTPS (or an existing TMDB image path); trailers use a YouTube ID or `watch?v=ID`.
+- **Accounts**: search members, assign an existing `user`, `moderator`, or `admin` role, and revoke all sessions for another account. Role changes also revoke sessions. Admins cannot change their own role, preserving administrator access. Signing out devices does not suspend an account. The moderator role retains its existing permissions; these management tools require admin access.
+- **Moderation**: search and review community stories and title comments, then confirm removal of inappropriate content. Respectful negative reviews are not grounds for removal, and the tool does not edit viewer scores.
+- **Manage homepage**, **Users & activity**, and **Community** retain their existing workflows. The overview reports live database counts and recent activity.
+
+Catalog deletion requires typing the exact current title. It permanently cascades to episodes, ratings, comments, favorites, and watchlist memberships; community stories remain, with their title reference cleared. Removal and role changes have confirmation dialogs. There is no new audit/history storage or database migration. Catalog sync/enrichment may overwrite manually edited provider metadata on a later explicit sync.
+
+All management endpoints sit behind the existing authenticated-session middleware and database-derived admin role check. Lists are searchable and paginated in batches of 20. New endpoints under `/api/account/admin` are `GET/POST /catalog`, `PUT/DELETE /catalog/:id`, `GET /accounts`, `PATCH /accounts/:id`, `DELETE /accounts/:id/sessions`, `GET /moderation`, and `DELETE /moderation/:kind/:id`.
+
+Catalog workflow follows the practice of searching before adding and keeping movie/series records distinct, described in [TMDB's contribution guidelines](https://www.themoviedb.org/bible/new_content?language=en-US). Access controls and confirmation policies above are ChitraVerse's implementation choices, not a universal movie-site permissions standard.
+
+### Ratings and activity endpoints
 
 Movie and series details show the ChitraVerse average and vote count from the existing `media_rating_summary` view. Ratings use the existing `review` table, with one active vote per user/title through the API; saving again replaces the vote. The interactive panel appears after the description and before the trailer. Title headers and the homepage hero show the same database aggregate beside TMDB; unrated titles display an em dash. No new migration is needed for this update; the existing migrations are still required for sessions, search, and homepage features.
 

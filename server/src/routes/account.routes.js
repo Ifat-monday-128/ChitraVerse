@@ -129,6 +129,7 @@ router.use(async (req, res, next) => {
 router.put('/password', throttle);
 router.use(require('./profile.routes'));
 router.use(require('./admin-dashboard.routes'));
+router.use(require('./admin-management.routes'));
 router.get("/admin/users", async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin access required." });
   const { rows } = await pool.query(`SELECT u.user_id,u.name,u.email,u.role,u.created_at,

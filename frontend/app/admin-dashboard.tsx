@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useState } from 'react';
+/* eslint-disable @next/next/no-html-link-for-pages -- Full navigation resets the custom History API router. */
 import { api, type User } from './api';
 import { AdminUsers } from './role-features';
 import AdminHomepage from './admin-homepage';
+import AdminManagement from './admin-management';
 import Community from './community';
 import './admin-dashboard.css';
 
 type Summary = { totals: Record<string,number>; roles: {role:string;count:number}[]; users: User[]; activity: {kind:string;id:number;name:string;title:string;occurred_at:string}[]; registrations: {day:string;count:number}[]; updated_at:string };
-type Tab = 'Overview'|'Users & activity'|'Manage homepage'|'Community';
+type Tab = 'Overview'|'Catalog'|'Accounts'|'Moderation'|'Users & activity'|'Manage homepage'|'Community';
 type Props = { user:User; busy:boolean; error:string; logout:()=>void; signIn:()=>void; openTitle:(id:number)=>void; openPerson:(id:number)=>void; openGenre:(id:number)=>void };
 const date = (value:string) => new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 
@@ -17,28 +19,29 @@ export default function AdminDashboard(props:Props) {
   const [error,setError]=useState(''); const [loading,setLoading]=useState(true);
   const [retry,setRetry]=useState(0); const [notice,setNotice]=useState('');
   useEffect(()=>{
-    const controller=new AbortController();setLoading(true);setError('');
+    const controller=new AbortController();
     api<Summary>('/api/account/admin/dashboard',{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setData(value);})
       .catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Could not load the dashboard.');})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
   },[retry]);
-  function navigate(next:Tab){setTab(next);setNotice('');if(next==='Overview')setRetry(n=>n+1);}
+  function refresh(){setLoading(true);setError('');setRetry(n=>n+1);}
+  function navigate(next:Tab){setTab(next);setNotice('');if(next==='Overview')refresh();}
   const total=(key:string)=>data?.totals[key]??0;
   const maxJoins=Math.max(1,...(data?.registrations.map(row=>row.count)||[]));
   return <section className={`admin-workspace ${tab === 'Overview' ? 'admin-overview' : ''}`} aria-label="Administration">
     <aside className="admin-sidebar"><a className="admin-wordmark" href="/" aria-label="ChitraVerse homepage">CHITRA<span>VERSE</span><small>ADMINISTRATION</small></a>
       <div className="admin-identity"><span className="admin-avatar">{props.user.avatar?<img src={props.user.avatar} alt=""/>:props.user.name.slice(0,2).toUpperCase()}</span><strong>{props.user.name}</strong><small>Administrator</small></div>
-      <nav aria-label="Admin navigation">{(['Overview','Users & activity','Manage homepage','Community'] as Tab[]).map((item,index)=><button key={item} onClick={()=>navigate(item)} aria-current={tab===item?'page':undefined}><span aria-hidden="true">{['◫','◎','◈','✎'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}</nav>
+      <nav aria-label="Admin navigation">{(['Overview','Catalog','Accounts','Moderation','Manage homepage','Users & activity','Community'] as Tab[]).map((item,index)=><button key={item} onClick={()=>navigate(item)} aria-current={tab===item?'page':undefined}><span aria-hidden="true">{['\u25eb','\u25a3','\u25ce','\u25c7','\u25c8','\u25f7','\u270e'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}</nav>
       <a className="admin-back-home" href="/"><span aria-hidden="true">←</span> Back to homepage</a>
       <button className="admin-logout" disabled={props.busy} onClick={props.logout}>{props.busy?'Signing out…':'Sign out'}<span aria-hidden="true">↗</span></button>
     </aside>
     <div className="admin-main"><header className="admin-topline"><span>Workspace <span aria-hidden="true">/</span> <strong>{tab}</strong></span><span className="admin-access">● Admin access</span></header>
-      <div className="admin-heading"><div><p className="eyebrow">THE BIG PICTURE</p><h1>{tab==='Overview'?'Admin dashboard':tab}</h1><p>{tab==='Overview'?`Welcome back, ${props.user.name}. Here’s what’s happening in ChitraVerse.`:'Your administration tools, together in one workspace.'}</p></div><button className="secondary-button" disabled={loading} onClick={()=>setRetry(n=>n+1)}>{loading?'Updating…':'↻ Refresh summary'}</button></div>
-      {(error||props.error)&&<p className="admin-feedback error" role="alert">{error||props.error}<button className="text-button" disabled={loading} onClick={()=>setRetry(n=>n+1)}>Try again</button></p>}
+      <div className="admin-heading"><div><p className="eyebrow">THE BIG PICTURE</p><h1>{tab==='Overview'?'Behind the screen.':tab}</h1><p>{tab==='Overview'?`Welcome back, ${props.user.name}. Here’s what’s happening in ChitraVerse.`:'Your administration tools, together in one workspace.'}</p></div><button className="secondary-button" disabled={loading} onClick={refresh}>{loading?'Updating…':'↻ Refresh summary'}</button></div>
+      {(error||props.error)&&<p className="admin-feedback error" role="alert">{error||props.error}<button className="text-button" disabled={loading} onClick={refresh}>Try again</button></p>}
       {notice&&<p className="admin-feedback" role="status">{notice}</p>}
       {tab==='Overview'&&<>{!data?(!error&&<p className="admin-loading" role="status">Loading database summary…</p>):<>
-        <div className="admin-stats">{[
+        <div className="admin-command-bar"><div><span className="eyebrow">CURATE. CONNECT. INSPIRE.</span><h2>A great movie night starts here.</h2><p>Shape the collection. Spotlight the stories worth discovering.</p></div><button className="primary-button" onClick={()=>navigate('Catalog')}>Manage catalog <span aria-hidden="true">&#8599;</span></button></div><div className="admin-stats">{[
           ['users','Registered accounts','All roles in your database','◎'],['movies','Movies','Titles in the movie library','▣'],['series','TV series','Titles in the series library','▤'],['stories','Community stories','Published by your community','✎'],
         ].map(([key,label,caption,icon])=><article key={key}><div><span>{label}</span><i aria-hidden="true">{icon}</i></div><strong>{total(key).toLocaleString()}</strong><small>{caption}</small></article>)}</div>
         <div className="admin-columns"><div className="admin-primary">
@@ -50,6 +53,7 @@ export default function AdminDashboard(props:Props) {
           <section className="admin-panel"><div className="admin-panel-heading"><h2>Recent activity</h2><span>Latest 8</span></div><ol className="admin-recent" tabIndex={0} aria-label="Recent activity">{data.activity.map(item=><li key={`${item.kind}-${item.id}`}><span aria-hidden="true">{{story:'✎',comment:'“',rating:'★'}[item.kind]}</span><div><strong>{item.name}</strong><p>{item.kind==='story'?'Published':item.kind==='comment'?'Commented on':'Rated'} <b>{item.title}</b></p><time dateTime={item.occurred_at}>{date(item.occurred_at)}</time></div></li>)}</ol>{!data.activity.length&&<p className="admin-empty">Community activity will appear here.</p>}</section>
         </div></div><p className="admin-updated">Updated {new Date(data.updated_at).toLocaleString()} · Counts are read from your database.</p>
       </>}</>}
+      {(tab==='Catalog'||tab==='Accounts'||tab==='Moderation')&&<AdminManagement key={tab} section={tab.toLowerCase() as 'catalog'|'accounts'|'moderation'} userId={props.user.user_id} changed={()=>setRetry(n=>n+1)}/>}
       {tab==='Users & activity'&&<div className="admin-panel admin-tool"><AdminUsers/></div>}
       {tab==='Manage homepage'&&<div className="admin-panel admin-tool"><AdminHomepage saved={()=>{setNotice('Homepage selection saved.');setTab('Overview');setRetry(n=>n+1);}}/></div>}
       {tab==='Community'&&<div className="admin-community"><Community user={props.user} signIn={props.signIn} sessionExpired={props.signIn} openTitle={props.openTitle} openPerson={props.openPerson} openGenre={props.openGenre}/></div>}

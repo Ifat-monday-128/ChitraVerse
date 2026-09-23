@@ -3,6 +3,7 @@ import type { User } from './api';
 import AdminDashboard from './admin-dashboard';
 import AccountProfile from './account-profile';
 import './dashboard.css';
+import './dashboard-cinema.css';
 
 type Props = {
   user: User | null;

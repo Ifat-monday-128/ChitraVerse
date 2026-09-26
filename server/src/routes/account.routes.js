@@ -39,12 +39,24 @@ async function currentUser(req) {
   return rows[0] || null;
 }
 
-async function createSession(req, res, user) {
-  const { token, expiresAt } = createJwt(user.user_id);
+async function createSession(req, res, user, registerUser) {
+  let token;
   const previousToken = sessionToken(req);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (registerUser) user = await registerUser(client);
+    else {
+      // Serialize login with password resets; an old password cannot create a
+      // new session after a concurrent reset has already revoked existing ones.
+      const locked = await client.query('SELECT password_hash FROM users WHERE user_id=$1 FOR UPDATE', [user.user_id]);
+      if (locked.rows[0]?.password_hash !== user.password_hash) {
+        await client.query('ROLLBACK');
+        return res.status(401).json({ error: 'Your password changed. Sign in again.' });
+      }
+    }
+    const issued = createJwt(user.user_id); token = issued.token;
+    const expiresAt = issued.expiresAt;
     // Replace this browser's old session when signing in to another account.
     await client.query("DELETE FROM user_session WHERE expires_at <= now() OR token_hash=$1", [previousToken ? hashToken(previousToken) : null]);
     await client.query("INSERT INTO user_session(token_hash,user_id,expires_at) VALUES($1,$2,$3)", [hashToken(token), user.user_id, expiresAt]);
@@ -78,6 +90,8 @@ router.get("/me", async (req, res) => {
   const { rows } = await pool.query('SELECT avatar FROM users WHERE user_id=$1', [user.user_id]);
   return res.json({ user: { ...user, avatar: rows[0]?.avatar || null } });
 });
+router.use(['/forgot-password','/reset-password'], throttle);
+router.use(require('./password-reset.routes'));
 router.post("/register", throttle, async (req, res) => {
   const { name, email, password } = req.body || {};
   if (typeof name !== "string" || !name.trim() || name.length > 255 || typeof email !== "string"
@@ -88,9 +102,11 @@ router.post("/register", throttle, async (req, res) => {
   const salt = randomBytes(16).toString("hex");
   const key = await scrypt(password, salt, 64);
   try {
-    const { rows } = await pool.query(`INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'user') RETURNING user_id,name,email,role`,
-      [name.trim(), email.trim().toLowerCase(), `scrypt:${salt}:${key.toString("hex")}`]);
-    return createSession(req, res, rows[0]);
+    return await createSession(req, res, null, async client => {
+      const { rows } = await client.query(`INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'user') RETURNING user_id,name,email,role`,
+        [name.trim(), email.trim().toLowerCase(), `scrypt:${salt}:${key.toString("hex")}`]);
+      return rows[0];
+    });
   } catch (error) {
     if (error.code === "23505") return res.status(409).json({ error: "An account with that email already exists. Sign in instead." });
     throw error;
@@ -116,7 +132,7 @@ router.post("/login", throttle, async (req, res) => {
 });
 router.post("/logout", async (req, res) => {
   const token = sessionToken(req);
-  if (token) await pool.query("DELETE FROM user_session WHERE token_hash=$1", [hashToken(token)]);
+  if (token) await pool.write("DELETE FROM user_session WHERE token_hash=$1", [hashToken(token)]);
   res.clearCookie(cookieName, cookieOptions());
   res.json({ user: null });
 });
@@ -129,15 +145,29 @@ router.use(async (req, res, next) => {
 router.put('/password', throttle);
 router.use(require('./profile.routes'));
 router.use(require('./admin-dashboard.routes'));
+router.use(require('./tmdb-import.routes'));
 router.use(require('./admin-management.routes'));
 router.get("/admin/users", async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin access required." });
   const { rows } = await pool.query(`SELECT u.user_id,u.name,u.email,u.role,u.created_at,
     COALESCE((SELECT json_agg(activity ORDER BY activity.occurred_at DESC) FROM (
-      SELECT 'rating' AS kind,m.title,r.rating,r.created_at AS occurred_at
-      FROM review r JOIN media m USING(title_id) WHERE r.user_id=u.user_id AND r.rating IS NOT NULL
+      SELECT 'rating' AS kind,a.title,a.new_rating AS rating,a.occurred_at,a.detail
+      FROM activity_log a WHERE a.user_id=u.user_id
       UNION ALL
-      SELECT 'watchlist' AS kind,m.title,NULL AS rating,wi.added_at AS occurred_at
+      SELECT 'rating',m.title,r.rating,r.created_at,'Previously saved rating: ' || r.rating || '/10 (before history tracking)'
+      FROM review r JOIN media m USING(title_id) WHERE r.user_id=u.user_id AND r.rating IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM activity_log a WHERE a.user_id=r.user_id AND a.title_id=r.title_id)
+      UNION ALL
+      SELECT 'favorite',m.title,NULL,f.added_at,'Added to favorites'
+      FROM favourite f JOIN media m USING(title_id) WHERE f.user_id=u.user_id
+      UNION ALL
+      SELECT 'comment',m.title,NULL,c.created_at,'Commented: ' || LEFT(c.content,160)
+      FROM media_comment c JOIN media m USING(title_id) WHERE c.user_id=u.user_id
+      UNION ALL
+      SELECT 'story',p.title,NULL,p.created_at,'Published a story'
+      FROM community_post p WHERE p.user_id=u.user_id
+      UNION ALL
+      SELECT 'watchlist' AS kind,m.title,NULL AS rating,wi.added_at AS occurred_at,NULL AS detail
       FROM watchlist w JOIN watchlist_item wi USING(watchlist_id) JOIN media m USING(title_id)
       WHERE w.user_id=u.user_id
     ) activity), '[]'::json) AS activities
@@ -183,7 +213,7 @@ router.post('/comments', async (req, res, next) => {
     if (!Number.isInteger(titleId) || titleId < 1 || titleId > 2147483647 || typeof content !== 'string' || !content.trim() || content.length > 2000) return res.status(400).json({ error: 'Enter a comment up to 2,000 characters.' });
     const exists = await pool.query('SELECT 1 FROM media WHERE title_id=$1', [titleId]);
     if (!exists.rowCount) return res.status(404).json({ error: 'Media not found.' });
-    const { rows } = await pool.query(`INSERT INTO media_comment(user_id,title_id,content) VALUES($1,$2,$3)
+    const { rows } = await pool.write(`INSERT INTO media_comment(user_id,title_id,content) VALUES($1,$2,$3)
       RETURNING comment_id,content,created_at`, [req.user.user_id,titleId,content.trim()]);
     res.status(201).json({ comment: { ...rows[0], user_id: req.user.user_id, name: req.user.name } });
   } catch (e) { next(e); }
@@ -198,7 +228,7 @@ router.post('/community', async (req, res, next) => {
     const { title, content, media_id, cast_crew_id, genre_id } = req.body || {};
     if (typeof title !== 'string' || !title.trim() || title.length > 200 || typeof content !== 'string' || !content.trim() || content.length > 10000) return res.status(400).json({ error: 'Add a title and post content.' });
     for (const id of [media_id, cast_crew_id, genre_id]) if (id != null && (!Number.isInteger(id) || id < 1 || id > 2147483647)) return res.status(400).json({ error: 'Choose valid tags from the search results.' });
-    const { rows } = await pool.query(`INSERT INTO community_post(user_id,title,content,media_id,cast_crew_id,genre_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [req.user.user_id,title.trim(),content.trim(),media_id||null,cast_crew_id||null,genre_id||null]);
+    const { rows } = await pool.write(`INSERT INTO community_post(user_id,title,content,media_id,cast_crew_id,genre_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [req.user.user_id,title.trim(),content.trim(),media_id||null,cast_crew_id||null,genre_id||null]);
     res.status(201).json({ post: { ...rows[0], name: req.user.name } });
   } catch (e) { if (e.code === '23503') return res.status(400).json({ error: 'A selected tag no longer exists. Choose another tag.' }); next(e); }
 });
@@ -219,10 +249,10 @@ router.put("/ratings/:titleId", async (req, res) => {
     const existing = await client.query("SELECT review_id FROM review WHERE user_id=$1 AND title_id=$2 ORDER BY created_at DESC,review_id DESC", [req.user.user_id,titleId]);
     if (existing.rowCount) {
       // Preserve any existing review text; only the latest review contributes a vote.
-      await client.query("UPDATE review SET rating=NULL WHERE user_id=$1 AND title_id=$2", [req.user.user_id,titleId]);
+      await client.query("UPDATE review SET rating=NULL WHERE user_id=$1 AND title_id=$2 AND review_id<>$3 AND rating IS NOT NULL", [req.user.user_id,titleId,existing.rows[0].review_id]);
       await client.query("UPDATE review SET rating=$1,created_at=now() WHERE review_id=$2", [rating,existing.rows[0].review_id]);
     } else await client.query("INSERT INTO review(user_id,title_id,rating) VALUES($1,$2,$3)", [req.user.user_id,titleId,rating]);
-    const summary = await client.query("SELECT chitraverse_rating,chitraverse_vote_count FROM media_rating_summary WHERE title_id=$1", [titleId]);
+    const summary = await client.query("SELECT * FROM get_title_rating($1)", [titleId]);
     await client.query("COMMIT");
     res.json({ rating, ...summary.rows[0] });
   } catch (error) { await client.query("ROLLBACK"); throw error; }
@@ -248,3 +278,9 @@ router.route('/watchlist/:titleId').put((req, res) => res.status(400).json({ err
   .delete((req, res) => res.status(400).json({ error: 'Choose a watchlist first.' }));
 router.use(require('./library.routes'));
 module.exports = router;
+module.exports.requireUser = async (req, res, next) => {
+  req.user = await currentUser(req);
+  if (!req.user) return res.status(401).json({ error: 'Sign in to continue.' });
+  res.set('Cache-Control','no-store');
+  next();
+};

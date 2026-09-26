@@ -32,7 +32,7 @@ router.get('/watchlists', async (req, res) => {
 });
 router.post('/watchlists', async (req, res) => {
   if (!validName(req.body?.name)) return res.status(400).json({ error: 'Enter a watchlist name of 1–255 characters.' });
-  const { rows } = await pool.query('INSERT INTO watchlist(user_id,name) VALUES($1,$2) RETURNING watchlist_id,name', [req.user.user_id, req.body.name.trim()]);
+  const { rows } = await pool.write('INSERT INTO watchlist(user_id,name) VALUES($1,$2) RETURNING watchlist_id,name', [req.user.user_id, req.body.name.trim()]);
   res.status(201).json({ watchlist: { ...rows[0], title_count: 0, contains_title: false } });
 });
 router.get('/watchlists/:listId', async (req, res) => {
@@ -44,12 +44,12 @@ router.get('/watchlists/:listId', async (req, res) => {
 });
 router.patch('/watchlists/:listId', async (req, res) => {
   if (!validName(req.body?.name)) return res.status(400).json({ error: 'Enter a watchlist name of 1–255 characters.' });
-  const { rows } = await pool.query('UPDATE watchlist SET name=$1 WHERE watchlist_id=$2 AND user_id=$3 RETURNING watchlist_id,name', [req.body.name.trim(), req.params.listId, req.user.user_id]);
+  const { rows } = await pool.write('UPDATE watchlist SET name=$1 WHERE watchlist_id=$2 AND user_id=$3 RETURNING watchlist_id,name', [req.body.name.trim(), req.params.listId, req.user.user_id]);
   if (!rows.length) return res.status(404).json({ error: 'Watchlist not found.' });
   res.json({ watchlist: rows[0] });
 });
 router.delete('/watchlists/:listId', async (req, res) => {
-  const result = await pool.query('DELETE FROM watchlist WHERE watchlist_id=$1 AND user_id=$2', [req.params.listId, req.user.user_id]);
+  const result = await pool.write('DELETE FROM watchlist WHERE watchlist_id=$1 AND user_id=$2', [req.params.listId, req.user.user_id]);
   if (!result.rowCount) return res.status(404).json({ error: 'Watchlist not found.' });
   res.json({ deleted: true });
 });

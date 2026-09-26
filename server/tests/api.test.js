@@ -45,6 +45,7 @@ test.after(async () => {
   await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end();
 });
 async function request(url, options = {}) {
+  if (url.startsWith('/api/media')) options = { ...options, headers: { Cookie: await require('./helpers/media-session')(pool), ...options.headers } };
   const response = await fetch(base + url, { ...options, headers: { "Content-Type": "application/json", ...options.headers } });
   return { status: response.status, body: await response.json(), cookie: response.headers.get("set-cookie")?.split(";")[0] };
 }

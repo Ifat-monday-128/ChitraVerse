@@ -179,6 +179,12 @@ html, body { background: #08090a; }
 }
 @media (prefers-reduced-motion:reduce) { .production-card:hover, .production-card:hover .production-link b { transform: none; } }
 
+.home-marquee { position: relative; overflow: hidden; padding: 8px 0 20px; mask-image: linear-gradient(90deg, transparent 0%, #000 7%, #000 93%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 7%, #000 93%, transparent 100%); }
+.home-marquee-track { display: flex; align-items: stretch; gap: 24px; width: max-content; animation: home-marquee-slide 44s linear infinite; will-change: transform; }
+.home-marquee-track .media-card { flex: 0 0 min(31vw, 310px); width: min(31vw, 310px); }
+.home-marquee:hover .home-marquee-track, .home-marquee:focus-within .home-marquee-track { animation-play-state: paused; }
+@keyframes home-marquee-slide { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 12px)); } }
+
 /* Full-width browsing, title pages and cast profiles. */
 .full-page-shell { width: 100%; max-width: none; margin: 0; border-radius: 0; min-height: 100svh; }
 .full-page-shell .rail-section { min-height: calc(100svh - 215px); }

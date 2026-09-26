@@ -207,7 +207,7 @@ export default function Home() {
       if (!controller.signal.aborted) { setDetail(data); setSeason(data.seasons?.[0] ? String(data.seasons[0].season_number) : ""); }
     }).catch((error) => { if (!controller.signal.aborted) setDetailError(message(error)); });
     return () => controller.abort();
-  }, [detailId]);
+  }, [detailId, user]);
   useEffect(() => {
     if (detailId === null || !season) return;
     const controller = new AbortController();
@@ -219,7 +219,7 @@ export default function Home() {
       .catch((error) => { if (!controller.signal.aborted) setEpisodeError(message(error)); })
       .finally(() => { if (!controller.signal.aborted) setEpisodesLoading(false); });
     return () => controller.abort();
-  }, [detailId, season]);
+  }, [detailId, season, user]);
   async function loadMore() {
     setLoadingMore(true); setError(""); const requestedRoute = window.location.search;
     try {
@@ -265,6 +265,7 @@ export default function Home() {
   const heading = route.view === "search" ? "Search the library" : route.view === "watchlist" ? "My watchlist" : route.collection === "hollywood" ? "Hollywood movies" : route.type === "series" ? "TV shows" : "Movies";
   const heroImage = hero ? posterUrl(hero.poster, "original") : undefined;
   const heroTrailer = trailerEmbedUrl(hero?.trailer_link);
+
 
   return <main className={`home-shell ${isHome ? "" : "full-page-shell"} ${isAdminDashboard ? "admin-shell" : ""}`}>
     {!isAdminDashboard && <section className={`hero ${isHome ? "" : "compact"} ${isSearchPage ? "search-page-hero" : ""}`} onFocusCapture={event => setHeroFocused(Boolean(event.target.closest('.hero-copy, .hero-carousel-controls')))} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setHeroFocused(false); }}>

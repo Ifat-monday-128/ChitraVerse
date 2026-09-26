@@ -13,7 +13,7 @@ async function createAccount() {
   const password = randomBytes(18).toString("base64url");
   const salt = randomBytes(16).toString("hex");
   const key = await promisify(scrypt)(password, salt, 64);
-  await pool.query(
+  await pool.write(
     "INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)",
     [name.trim(), email, `scrypt:${salt}:${key.toString("hex")}`, role],
   );

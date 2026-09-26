@@ -43,6 +43,7 @@ test.after(async () => {
 });
 
 async function request(url, { body, cookie, method = body ? "POST" : "GET" } = {}) {
+  if (url.startsWith('/api/media') && !cookie) cookie = await require('./helpers/media-session')(pool);
   const response = await fetch(base + url, {
     method,
     headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
@@ -99,56 +100,63 @@ test('community persists real tags, validates references and identifies authors 
 });
 
 test('server bootstraps missing database migrations before comment requests', async () => {
-  const schema = `chitraverse_bootstrap_${process.pid}_${Date.now()}`;
-  await admin.query(`CREATE SCHEMA ${schema}`);
-  await pool.query(`SET search_path TO ${schema},public`);
-  await pool.query(await fs.readFile(path.resolve(__dirname, '../database/schema.sql'), 'utf8'));
-  const salt = randomBytes(16).toString('hex');
-  const hash = `scrypt:${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
-  await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)", ['bootstrap-user', 'bootstrap@example.invalid', hash, 'user']);
-  const mediaId = (await pool.query("INSERT INTO media(title) VALUES('Fresh title') RETURNING title_id")).rows[0].title_id;
-  const child = spawn(process.execPath, ['src/server.js'], {
-    cwd: path.resolve(__dirname, '..'),
-    env: { ...process.env, PORT: '6111', PGOPTIONS: `-c search_path=${schema},public` },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  let output = '';
-  child.stdout.on('data', chunk => { output += chunk.toString(); });
-  child.stderr.on('data', chunk => { output += chunk.toString(); });
-
-  const started = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('server did not start')), 20000);
-    child.once('exit', (code) => reject(new Error(`server exited early with code ${code}\n${output}`)));
-    const check = setInterval(() => {
-      if (output.includes('ChitraVerse API running at http://localhost:6111')) {
-        clearInterval(check);
-        clearTimeout(timer);
-        resolve();
-      }
-    }, 100);
-  });
-
+  const bootstrapSchema = 'chitraverse_bootstrap_' + process.pid + '_' + Date.now();
+  let child;
+  await admin.query('CREATE SCHEMA ' + bootstrapSchema);
   try {
-    const login = await fetch('http://127.0.0.1:6111/api/account/login', {
+    const seed = await admin.connect();
+    let mediaId;
+    try {
+      await seed.query('BEGIN');
+      await seed.query('SET LOCAL search_path TO ' + bootstrapSchema + ',public');
+      await seed.query(await fs.readFile(path.resolve(__dirname, '../database/schema.sql'), 'utf8'));
+      const salt = randomBytes(16).toString('hex');
+      const hash = 'scrypt:' + salt + ':' + scryptSync(password, salt, 64).toString('hex');
+      await seed.query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)', ['bootstrap-user', 'bootstrap@example.invalid', hash, 'user']);
+      mediaId = (await seed.query("INSERT INTO media(title) VALUES('Fresh title') RETURNING title_id")).rows[0].title_id;
+      await seed.query('COMMIT');
+    } catch (error) { await seed.query('ROLLBACK'); throw error; }
+    finally { seed.release(); }
+    child = spawn(process.execPath, ['src/server.js'], {
+      cwd: path.resolve(__dirname, '..'),
+      env: { ...process.env, PORT: '0', PGOPTIONS: '-c search_path=' + bootstrapSchema + ',public' },
+      stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    });
+    const origin = await new Promise((resolve, reject) => {
+      let output = '';
+      const timeout = setTimeout(() => finish(new Error('server did not start: ' + output)), 20000);
+      function finish(error, url) {
+        clearTimeout(timeout); child.off('exit', exited); child.off('error', finish);
+        child.stdout.off('data', receive); child.stderr.off('data', receive);
+        if (error) reject(error); else resolve(url);
+      }
+      function exited(code) { finish(new Error('server exited early with code ' + code + ': ' + output)); }
+      function receive(chunk) {
+        output += chunk.toString();
+        const match = output.match(/ChitraVerse API running at http:\/\/localhost:(\d+)/);
+        if (match) finish(null, 'http://127.0.0.1:' + match[1]);
+      }
+      child.once('exit', exited); child.once('error', finish);
+      child.stdout.on('data', receive); child.stderr.on('data', receive);
+    });
+    const login = await fetch(origin + '/api/account/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'bootstrap@example.invalid', password }),
+      body: JSON.stringify({ email: 'bootstrap@example.invalid', password }), signal: AbortSignal.timeout(10000),
     });
     const loginBody = await login.json();
-    assert.equal(login.status, 200, `login failed: ${JSON.stringify(loginBody)}`);
+    assert.equal(login.status, 200, 'login failed: ' + JSON.stringify(loginBody));
     const cookie = login.headers.get('set-cookie')?.split(';')[0];
-    const comment = await fetch(`http://127.0.0.1:6111/api/account/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
-      body: JSON.stringify({ title_id: mediaId, content: 'Bootstrapped comment' }),
+    const comment = await fetch(origin + '/api/account/comments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ title_id: mediaId, content: 'Bootstrapped comment' }), signal: AbortSignal.timeout(10000),
     });
     const commentBody = await comment.json();
-    assert.equal(comment.status, 201, `comment failed: ${JSON.stringify(commentBody)}`);
+    assert.equal(comment.status, 201, 'comment failed: ' + JSON.stringify(commentBody));
     assert.equal(commentBody.comment.content, 'Bootstrapped comment');
   } finally {
-    child.kill('SIGTERM');
-    await new Promise((resolve) => child.once('exit', resolve));
-    await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    if (child && child.exitCode === null && child.signalCode === null) {
+      await new Promise(resolve => { child.once('exit', resolve); child.kill('SIGTERM'); });
+    }
+    await admin.query('DROP SCHEMA IF EXISTS ' + bootstrapSchema + ' CASCADE');
   }
 });
-

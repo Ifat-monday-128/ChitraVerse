@@ -11,7 +11,7 @@ process.env.PGOPTIONS = `-c search_path=${schema},public`;
 const pool = require('../src/config/db');
 const app = require('../src/app');
 const password = 'Profile test password 123';
-let server, base;
+let server, base, historyUserCookie, historyAdminCookie;
 test.before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`);
   for (const file of ['schema.sql', 'migrations/001_search_and_sessions.sql', 'migrations/003_community_comments.sql']) await pool.query(await fs.readFile(path.resolve(__dirname, '../database', file), 'utf8'));
@@ -53,6 +53,7 @@ test('profile photo and name persist, validation rejects unsafe input, and acces
 test('overview and paginated activity include only the authenticated account data', async () => {
   const { cookie } = await login('first');
   const otherCookie = (await login('second')).cookie;
+  historyUserCookie = otherCookie;
   const id = (await pool.query("INSERT INTO media(title) VALUES('A favorite film') RETURNING title_id")).rows[0].title_id;
   await pool.query('INSERT INTO movie(title_id) VALUES($1)', [id]);
   await request(`/favorites/${id}`, cookie, null, 'PUT');
@@ -78,7 +79,8 @@ test('overview and paginated activity include only the authenticated account dat
 test('admin dashboard reports database totals and recent activity only to administrators', async () => {
   assert.equal((await request('/admin/dashboard')).status, 401);
   assert.equal((await request('/admin/dashboard', (await login('second')).cookie)).status, 403);
-  const result = await request('/admin/dashboard', (await login('admin')).cookie);
+  historyAdminCookie = (await login('admin')).cookie;
+  const result = await request('/admin/dashboard', historyAdminCookie);
   assert.equal(result.status, 200);
   assert.equal(result.data.totals.users, 3);
   assert.equal(result.data.totals.movies, 1);
@@ -93,6 +95,34 @@ test('admin dashboard reports database totals and recent activity only to admini
   assert.equal(result.data.activity[0].kind, 'comment');
   assert.equal(result.data.users.length, 3);
   assert.ok(result.data.users.every(user => !('password_hash' in user)));
+});
+
+test('older saved ratings remain visible alongside other activity without duplicate trigger events', async () => {
+  const cookie = historyUserCookie;
+  const adminCookie = historyAdminCookie;
+  const id = (await pool.query("INSERT INTO media(title) VALUES('Before tracking') RETURNING title_id")).rows[0].title_id;
+  await pool.query('INSERT INTO movie(title_id) VALUES($1)', [id]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('ALTER TABLE review DISABLE TRIGGER review_rating_activity');
+    await client.query('INSERT INTO review(user_id,title_id,rating) VALUES(2,$1,7)', [id]);
+    await client.query('ALTER TABLE review ENABLE TRIGGER review_rating_activity');
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK'); throw e; }
+  finally { client.release(); }
+  const activities = async () => (await request('/admin/users', adminCookie)).data.users;
+  const prior = (await activities()).find(u => u.user_id === 2).activities;
+  assert.equal(prior.length, 1);
+  assert.match(prior[0].detail, /Previously saved rating/);
+  assert.match((await request('/activity', cookie)).data.items[0].detail, /Previously saved rating/);
+  const firstUser = (await activities()).find(u => u.user_id === 1);
+  for (const kind of ['favorite','comment','story','watchlist','rating']) assert.ok(firstUser.activities.some(a => a.kind === kind));
+  await request(`/ratings/${id}`, cookie, { rating: 9 }, 'PUT');
+  const after = (await activities()).find(u => u.user_id === 2).activities;
+  assert.equal(after.length, 1);
+  assert.match(after[0].detail, /Changed rating from 7.0 to 9.0/);
+  assert.equal((await request('/activity', cookie)).data.items.length, 1);
 });
 
 test('changing password verifies the old secret, hashes the new one and revokes other sessions', async () => {

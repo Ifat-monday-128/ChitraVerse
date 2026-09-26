@@ -37,28 +37,20 @@ function metadata(body) {
 async function saveTitle(req, res) {
   const values = metadata(req.body);
   if (!values || (!req.params.id && !['movie','series'].includes(req.body.media_type))) return res.status(400).json({ error: 'Check the title, date, runtime, HTTPS poster and YouTube video ID.' });
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    let id = req.params.id, type = req.body.media_type;
-    if (id) {
-      const existing = await client.query(`SELECT CASE WHEN EXISTS(SELECT 1 FROM movie WHERE title_id=m.title_id) THEN 'movie' ELSE 'series' END AS media_type FROM media m WHERE title_id=$1 FOR UPDATE`, [id]);
-      if (!existing.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Title not found.' }); }
-      type = existing.rows[0].media_type;
-      await client.query('UPDATE media SET title=$1,description=$2,language=$3,poster=$4,trailer_link=$5 WHERE title_id=$6', [...values.slice(0,5), id]);
-    } else {
-      id = (await client.query('INSERT INTO media(title,description,language,poster,trailer_link) VALUES($1,$2,$3,$4,$5) RETURNING title_id', values.slice(0,5))).rows[0].title_id;
-      await client.query(type === 'movie' ? 'INSERT INTO movie(title_id) VALUES($1)' : 'INSERT INTO series(title_id) VALUES($1)', [id]);
-    }
-    if (type === 'movie') await client.query('UPDATE movie SET release_date=$1,runtime=$2 WHERE title_id=$3', [values[5], values[6], id]);
-    else await client.query('UPDATE series SET first_air_date=$1 WHERE title_id=$2', [values[5], id]);
-    await client.query('COMMIT'); res.status(req.params.id ? 200 : 201).json({ title_id: Number(id) });
-  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+    const result = await pool.withTransaction(client => client.query(
+      'CALL save_catalog_title($1::int,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::date,$9::int)',
+      [req.params.id || null, req.body.media_type || null, ...values]));
+    res.status(req.params.id ? 200 : 201).json({ title_id: result.rows[0].p_title_id });
+  } catch (error) {
+    if (error.code === 'P0002') return res.status(404).json({ error: 'Title not found.' });
+    throw error;
+  }
 }
 router.post('/admin/catalog', saveTitle);
 router.put('/admin/catalog/:id', saveTitle);
 router.delete('/admin/catalog/:id', async (req, res) => {
-  const result = await pool.query('DELETE FROM media WHERE title_id=$1 AND title=$2 RETURNING title_id', [req.params.id, req.body?.confirmation]);
+  const result = await pool.write('DELETE FROM media WHERE title_id=$1 AND title=$2 RETURNING title_id', [req.params.id, req.body?.confirmation]);
   if (!result.rowCount) return res.status(409).json({ error: 'Title changed or was removed. Refresh and confirm its exact name.' });
   res.json({ deleted: true });
 });
@@ -87,7 +79,7 @@ router.patch('/admin/accounts/:id', async (req, res) => {
 router.delete('/admin/accounts/:id/sessions', async (req, res) => {
   if (Number(req.params.id) === req.user.user_id) return res.status(400).json({ error: 'Use Sign out for your own account.' });
   if (!(await pool.query('SELECT 1 FROM users WHERE user_id=$1', [req.params.id])).rowCount) return res.status(404).json({ error: 'Account not found.' });
-  await pool.query('DELETE FROM user_session WHERE user_id=$1', [req.params.id]);
+  await pool.write('DELETE FROM user_session WHERE user_id=$1', [req.params.id]);
   res.json({ revoked: true });
 });
 router.get('/admin/moderation', async (req, res) => {
@@ -101,7 +93,7 @@ router.get('/admin/moderation', async (req, res) => {
 router.delete('/admin/moderation/:kind/:id', async (req, res) => {
   const query = { story: 'DELETE FROM community_post WHERE post_id=$1 RETURNING post_id', comment: 'DELETE FROM media_comment WHERE comment_id=$1 RETURNING comment_id' }[req.params.kind];
   if (!query) return res.status(400).json({ error: 'Invalid content type.' });
-  if (!(await pool.query(query, [req.params.id])).rowCount) return res.status(404).json({ error: 'Content already removed.' });
+  if (!(await pool.write(query, [req.params.id])).rowCount) return res.status(404).json({ error: 'Content already removed.' });
   res.json({ deleted: true });
 });
 module.exports = router;

@@ -48,7 +48,7 @@ export function MovieRating({ movie, user, updated, signIn }: { movie: Media; us
   </section>;
 }
 
-type AdminUser = User & { created_at: string; activities: { kind: "rating" | "watchlist"; title: string; rating: string | null; occurred_at: string }[] };
+type AdminUser = User & { created_at: string; activities: { kind: "rating" | "watchlist" | "favorite" | "comment" | "story"; title: string; rating: string | null; detail?: string; occurred_at: string }[] };
 export function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,16 +63,16 @@ export function AdminUsers() {
     return () => controller.abort();
   }, [retry]);
   return <section aria-label="Users and activity"><p className="eyebrow">ADMIN</p><h2>Users &amp; activity</h2>
-    <p>Registered accounts, their latest title ratings, and currently saved watchlist titles.</p>
+    <p>Registered accounts, rating history, saved favorites, watchlist titles, comments, and community stories.</p>
     <button className="secondary-button" disabled={loading} onClick={() => { setLoading(true); setRetry(value => value + 1); }}>Refresh</button>
     {loading ? <p role="status">Loading users…</p> : error ? <p role="alert" className="message error">{error}</p> : <>
-      <p>{users.length} registered accounts</p>
+      <p>{users.length} registered accounts</p><p>Older ratings show the saved value, not a complete edit history. Removed records from before tracking cannot be recovered here.</p>
       {users.map(user => <article className="role-panel" key={user.user_id}>
         <h3>{user.name}</h3><p className="account-email">{user.email}</p><p>Role: {user.role || "Not assigned"} · Joined {new Date(user.created_at).toLocaleDateString()}</p>
         {user.activities.length ? <ul className="activity-list">{user.activities.map((activity, index) => <li key={index}>
-          <span>{activity.kind === "rating" ? `Rated ${activity.title} ${activity.rating}/10` : `Saved ${activity.title} to watchlist`}</span>
+          <span>{activity.kind !== "watchlist" ? `${activity.detail} · ${activity.title}` : `Saved ${activity.title} to watchlist`}</span>
           <small>{new Date(activity.occurred_at).toLocaleString()}</small>
-        </li>)}</ul> : <p>No ratings or saved titles.</p>}
+        </li>)}</ul> : <p>No recorded activity yet.</p>}
       </article>)}
     </>}
   </section>;

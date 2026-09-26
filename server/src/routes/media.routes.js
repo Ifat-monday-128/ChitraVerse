@@ -4,7 +4,7 @@ const mediaController = require("../controllers/media.controller");
 const router = express.Router();
 const pool = require('../config/db');
 
-// Published stories are readable by everyone; publishing stays authenticated.
+// Catalog and published stories are public; account writes remain authenticated.
 router.get('/community', async (req, res) => {
   const offset = Number(req.query.offset || 0);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) return res.status(400).json({ error: 'Invalid pagination.' });

@@ -115,7 +115,7 @@ async function main() {
         const suffix = match ? `watch?v=${match.id}` : null;
         report[row.title_id] = { title: row.title, query, provider, status: match ? "matched" : "unmatched", checked_at: new Date().toISOString(), match, candidates: videos.slice(0, 4), applied: false };
         if (apply && match) {
-          const result = await pool.query("UPDATE media SET trailer_link=$1 WHERE title_id=$2 AND trailer_link IS NOT DISTINCT FROM $3", [suffix, row.title_id, row.trailer_link]);
+          const result = await pool.write("UPDATE media SET trailer_link=$1 WHERE title_id=$2 AND trailer_link IS NOT DISTINCT FROM $3", [suffix, row.title_id, row.trailer_link]);
           report[row.title_id].applied = result.rowCount === 1;
         }
         consecutiveErrors = 0;

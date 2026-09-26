@@ -42,6 +42,7 @@ test.after(async () => {
 });
 
 async function request(url, { body, cookie, method = body ? "POST" : "GET" } = {}) {
+  if (url.startsWith('/api/media') && !cookie) cookie = await require('./helpers/media-session')(pool);
   const response = await fetch(base + url, {
     method,
     headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },

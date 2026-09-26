@@ -22,6 +22,7 @@ test.before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`);
   await pool.query(await fs.readFile(path.resolve(__dirname, "../database/schema.sql"), "utf8"));
   await pool.query(await fs.readFile(path.resolve(__dirname, "../database/migrations/001_search_and_sessions.sql"), "utf8"));
+  await pool.query(await fs.readFile(path.resolve(__dirname, "../database/migrations/003_community_comments.sql"), "utf8"));
   assert.equal((await pool.query("SELECT current_schema() AS name")).rows[0].name, schema);
   // admin/moderator are test fixtures proving that login is not hardcoded to user.
   for (const role of roles) {
@@ -42,6 +43,7 @@ test.after(async () => {
 });
 
 async function request(url, { body, cookie, method = body ? "POST" : "GET" } = {}) {
+  if (url.startsWith('/api/media') && !cookie) cookie = await require('./helpers/media-session')(pool);
   const response = await fetch(base + url, {
     method,
     headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
@@ -89,7 +91,9 @@ test("users rate movies once; admin can inspect activity but cannot rate or use 
   assert.equal(users.status,200);
   assert.ok(users.body.users.every(row=>!('password_hash' in row)));
   const activity = users.body.users.find(row=>row.email==='user@example.invalid').activities;
-  assert.equal(activity.length,3);
+  assert.equal(activity.filter(row => row.kind === 'watchlist').length, 1);
+  assert.ok(activity.filter(row => row.kind === 'rating').length >= 5);
+  assert.ok(activity.some(row => row.detail?.includes('Changed rating from')));
   assert.ok(activity.some(row=>row.kind==='rating' && Number(row.rating)===6));
   assert.ok(activity.some(row=>row.kind==='watchlist'));
   await request('/api/account/logout',{method:'POST',cookie:adminCookie});

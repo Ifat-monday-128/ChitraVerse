@@ -1,5 +1,7 @@
 ﻿# ChitraVerse
 
+For the completed checklist features, TMDB-link imports, and Gmail OTP setup, see [Checklist and setup guide](information/CHECKLIST_AND_SETUP.md). Catalog browsing is public; account features and admin operations require sign-in.
+
 ChitraVerse is a movie and TV series discovery application built with React, an Express API, and PostgreSQL. TMDB supplies catalog metadata; a separate web-search workflow discovers YouTube trailers. Users can browse titles, search by title or actor, inspect details and episodes, and maintain a private watchlist.
 
 ## Contents
@@ -24,7 +26,7 @@ Browser -> TMDB image CDN / stored HTTPS poster URL
 Browser -> YouTube when a trailer is opened
 ```
 
-The browser obtains catalog records through the API. Poster paths and trailer references come from the database, although external providers serve the actual images and videos. Missing data produces loading, empty, unavailable, or error states. There is no sample-film fallback or manufactured Interstellar artwork. Cast profiles, biographies, filmographies, search, and title details use only local database records. Missing profile fields remain unavailable. Legacy TMDB title links resolve only to already imported local titles; they return 404 otherwise. TMDB API access is confined to the explicit import/enrichment scripts.
+The browser obtains catalog records through the API. Poster paths and trailer references come from the database, although external providers serve the actual images and videos. Missing data produces loading, empty, unavailable, or error states. There is no sample-film fallback or manufactured Interstellar artwork. Cast profiles, biographies, filmographies, search, and title details use only local database records. Missing profile fields remain unavailable. Legacy TMDB title links resolve only to already imported local titles; they return 404 otherwise. TMDB API access is confined to explicit import/enrichment scripts and the administrator TMDB-link importer.
 
 The frontend uses React 19, Next.js-compatible application conventions, vinext, Vite, and Tailwind CSS. The application database is PostgreSQL. The frontend's optional Drizzle/D1 examples and hosting bindings are starter infrastructure, not the movie or account database.
 
@@ -162,13 +164,13 @@ Enrichment visits stored movies and series with TMDB IDs. It fills movie runtime
 
 Both commands use upserts and can be rerun to refresh records. Imports are incremental rather than a single transaction for the whole catalog. Enrichment logs individual title failures and continues, so inspect its output even when the command completes. Neither import runs automatically when the application starts.
 
-The current schema makes `media.tmdb_id` unique across movies and TV shows. Overlapping upstream movie/TV IDs cannot be represented separately by this importer; consider this existing constraint before substantially expanding imports.
+TMDB identity is unique by `(tmdb_id, tmdb_type)`, so movies and TV series with the same upstream numeric ID can coexist. Migration 006 adds this distinction without changing local title IDs.
 
 ### Database relationships
 
 `media` stores common title fields. `movie` and `series` supply type-specific fields; series connect to seasons and episodes. Join tables associate titles with genres, cast/crew roles, and production houses. Users own watchlists and their items. The migration adds revocable hashed JWT session records, while rating and season summary views support title details.
 
-The schema also includes reviews, favourites, awards, and streaming-platform tables. These do not currently have corresponding editing workflows or public endpoints in the application.
+Reviews/ratings and favorites have authenticated workflows. The TMDB importer fills streaming-platform relationships when available; awards remain manually maintained database metadata.
 
 ## Trailer workflow
 

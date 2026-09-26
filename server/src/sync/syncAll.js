@@ -20,7 +20,7 @@ async function syncGenres() {
   }
 
   for (const [tmdbId, name] of genres) {
-    await pool.query(
+    await pool.write(
       `INSERT INTO genre (tmdb_id, name)
        VALUES ($1, $2)
        ON CONFLICT (tmdb_id)
@@ -34,10 +34,10 @@ async function syncGenres() {
 
 async function upsertMedia(item, type) {
   const isMovie = type === "movie";
-  const result = await pool.query(
-    `INSERT INTO media (tmdb_id, title, description, language, poster, tmdb_rating)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (tmdb_id)
+  const result = await pool.write(
+    `INSERT INTO media (tmdb_id, title, description, language, poster, tmdb_rating, tmdb_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (tmdb_id,tmdb_type)
      DO UPDATE SET
        title = EXCLUDED.title,
        description = EXCLUDED.description,
@@ -52,6 +52,7 @@ async function upsertMedia(item, type) {
       item.original_language || null,
       item.poster_path || null,
       item.vote_average ?? null,
+      type,
     ],
   );
 
@@ -60,7 +61,7 @@ async function upsertMedia(item, type) {
 
 async function linkGenres(titleId, genreIds = []) {
   for (const tmdbGenreId of genreIds) {
-    await pool.query(
+    await pool.write(
       `INSERT INTO media_genre (title_id, genre_id)
        SELECT $1, genre_id FROM genre WHERE tmdb_id = $2
        ON CONFLICT DO NOTHING`,
@@ -75,7 +76,7 @@ async function syncMovies() {
 
     for (const movie of data.results) {
       const titleId = await upsertMedia(movie, "movie");
-      await pool.query(
+      await pool.write(
         `INSERT INTO movie (title_id, release_date)
          VALUES ($1, $2)
          ON CONFLICT (title_id)
@@ -95,7 +96,7 @@ async function syncTV() {
 
     for (const show of data.results) {
       const titleId = await upsertMedia(show, "tv");
-      await pool.query(
+      await pool.write(
         `INSERT INTO series (title_id, first_air_date)
          VALUES ($1, $2)
          ON CONFLICT (title_id)

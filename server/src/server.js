@@ -23,7 +23,7 @@ async function start() {
       process.exitCode = 1;
       return;
     }
-    console.log(`ChitraVerse API running at http://localhost:${port}`);
+    console.log(`ChitraVerse API running at http://localhost:${server.address().port}`);
   });
 
   async function shutdown(signal) {

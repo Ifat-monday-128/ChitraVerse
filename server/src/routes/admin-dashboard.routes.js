@@ -22,11 +22,16 @@ router.get('/admin/dashboard', async (req, res) => {
     pool.query(`SELECT COALESCE(role,'Unassigned') AS role,COUNT(*)::int AS count FROM users GROUP BY role ORDER BY count DESC,role`),
     pool.query('SELECT user_id,name,email,role,created_at FROM users ORDER BY created_at DESC,user_id DESC LIMIT 6'),
     pool.query(`SELECT * FROM (
-      (SELECT 'story' AS kind,p.post_id AS id,u.name,p.title,p.created_at AS occurred_at FROM community_post p JOIN users u USING(user_id) ORDER BY p.created_at DESC,p.post_id DESC LIMIT 8)
+      (SELECT 'story' AS kind,p.post_id AS id,u.name,p.title,p.created_at AS occurred_at,NULL::text AS detail FROM community_post p JOIN users u USING(user_id) ORDER BY p.created_at DESC,p.post_id DESC LIMIT 8)
       UNION ALL
-      (SELECT 'comment',c.comment_id,u.name,m.title,c.created_at FROM media_comment c JOIN users u USING(user_id) JOIN media m USING(title_id) ORDER BY c.created_at DESC,c.comment_id DESC LIMIT 8)
+      (SELECT 'comment',c.comment_id,u.name,m.title,c.created_at,NULL::text FROM media_comment c JOIN users u USING(user_id) JOIN media m USING(title_id) ORDER BY c.created_at DESC,c.comment_id DESC LIMIT 8)
       UNION ALL
-      (SELECT 'rating',r.review_id,u.name,m.title,r.created_at FROM review r JOIN users u USING(user_id) JOIN media m USING(title_id) WHERE r.rating IS NOT NULL ORDER BY r.created_at DESC,r.review_id DESC LIMIT 8)
+      (SELECT 'rating',a.activity_id,u.name,a.title,a.occurred_at,a.detail FROM activity_log a JOIN users u USING(user_id) ORDER BY a.occurred_at DESC,a.activity_id DESC LIMIT 8)
+      UNION ALL
+      (SELECT 'rating',-r.review_id,u.name,m.title,r.created_at,'Previously saved rating: ' || r.rating || '/10 (before history tracking)'
+        FROM review r JOIN users u USING(user_id) JOIN media m USING(title_id) WHERE r.rating IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM activity_log a WHERE a.user_id=r.user_id AND a.title_id=r.title_id)
+        ORDER BY r.created_at DESC,r.review_id DESC LIMIT 8)
     ) recent ORDER BY occurred_at DESC,kind,id DESC LIMIT 8`),
     pool.query(`SELECT to_char(day,'YYYY-MM-DD') AS day,COUNT(u.user_id)::int AS count
       FROM generate_series(CURRENT_DATE-6,CURRENT_DATE,interval '1 day') AS day

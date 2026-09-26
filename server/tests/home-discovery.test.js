@@ -7,11 +7,13 @@ const admin = new Pool({ host: process.env.DB_HOST, port: Number(process.env.DB_
 process.env.PGOPTIONS = `-c search_path=${schema},public`;
 const pool = require('../src/config/db');
 let server, base;
+async function fetch(url) { return globalThis.fetch(url,{headers:{Cookie:await require('./helpers/media-session')(pool)}}); }
 
 test.before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`);
   const fs = require('node:fs/promises');
   await pool.query(await fs.readFile(require('node:path').resolve(__dirname, '../database/schema.sql'), 'utf8'));
+  await pool.query(await fs.readFile(require('node:path').resolve(__dirname, '../database/migrations/001_search_and_sessions.sql'), 'utf8'));
   assert.equal((await pool.query('SELECT current_schema() AS name')).rows[0].name, schema);
   server = require('../src/app').listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));

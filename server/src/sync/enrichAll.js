@@ -8,7 +8,7 @@ const delay = (milliseconds) => new Promise((resolve) => {
 });
 
 async function linkPerson(titleId, person, roleType) {
-  const result = await pool.query(
+  const result = await pool.write(
     `INSERT INTO cast_crew (tmdb_id, name, photo)
      VALUES ($1, $2, $3)
      ON CONFLICT (tmdb_id)
@@ -17,7 +17,7 @@ async function linkPerson(titleId, person, roleType) {
     [person.id, person.name, person.profile_path || null],
   );
 
-  const roleResult = await pool.query(
+  const roleResult = await pool.write(
     `INSERT INTO role (role_name)
      VALUES ($1)
      ON CONFLICT (role_name)
@@ -26,7 +26,7 @@ async function linkPerson(titleId, person, roleType) {
     [roleType],
   );
 
-  await pool.query(
+  await pool.write(
     `INSERT INTO media_cast_crew (title_id, cast_crew_id, role_id)
      VALUES ($1, $2, $3)
      ON CONFLICT DO NOTHING`,
@@ -49,7 +49,7 @@ async function linkCastAndCompanies(titleId, credits = {}, companies = []) {
   }
 
   for (const company of companies) {
-    const result = await pool.query(
+    const result = await pool.write(
       `INSERT INTO production_house (tmdb_id, name, country, logo)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (tmdb_id)
@@ -66,7 +66,7 @@ async function linkCastAndCompanies(titleId, credits = {}, companies = []) {
       ],
     );
 
-    await pool.query(
+    await pool.write(
       `INSERT INTO media_company (title_id, company_id)
        VALUES ($1, $2)
        ON CONFLICT DO NOTHING`,
@@ -80,13 +80,13 @@ async function enrichMovie(titleId, tmdbId) {
     params: { append_to_response: "credits" },
   });
 
-  await pool.query(
+  await pool.write(
     `UPDATE media
      SET budget = $1
      WHERE title_id = $2`,
     [data.budget || null, titleId],
   );
-  await pool.query(
+  await pool.write(
     `UPDATE movie
      SET runtime = $1, box_office_gross = $2
      WHERE title_id = $3`,
@@ -98,7 +98,7 @@ async function enrichMovie(titleId, tmdbId) {
 }
 
 async function upsertSeasonAndEpisodes(titleId, tmdbId, seasonSummary) {
-  const seasonResult = await pool.query(
+  const seasonResult = await pool.write(
     `INSERT INTO season (title_id, season_number)
      VALUES ($1, $2)
      ON CONFLICT (title_id, season_number)
@@ -112,7 +112,7 @@ async function upsertSeasonAndEpisodes(titleId, tmdbId, seasonSummary) {
   );
 
   for (const episode of data.episodes || []) {
-    await pool.query(
+    await pool.write(
       `INSERT INTO episode
          (season_id, title, episode_number, runtime, air_date)
        VALUES ($1, $2, $3, $4, $5)
@@ -137,7 +137,7 @@ async function enrichTV(titleId, tmdbId) {
     params: { append_to_response: "credits" },
   });
 
-  await pool.query(
+  await pool.write(
     `UPDATE series
      SET status = $1, last_air_date = $2
      WHERE title_id = $3`,

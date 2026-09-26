@@ -33,15 +33,16 @@ function apiBase() {
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const base = apiBase();
+  const timeout = path === '/api/account/forgot-password' ? 45000 : 15000;
   const response = await fetch(base.replace(/\/$/, "") + path, {
     ...options, credentials: "include",
-    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
+    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
     headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
   });
   const data: unknown = await response.json();
   if (!response.ok) {
     const detail = data && typeof data === "object" && "error" in data ? String(data.error) : "The request could not be completed.";
-    if (response.status === 401 && path.startsWith("/api/account/") && !["/api/account/me", "/api/account/login", "/api/account/register"].includes(path) && typeof window !== "undefined") {
+    if (response.status === 401 && (path.startsWith("/api/account/") || path.startsWith("/api/media")) && !["/api/account/me", "/api/account/login", "/api/account/register"].includes(path) && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(sessionExpiredEvent));
     }
     throw new ApiError(detail, response.status);

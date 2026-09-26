@@ -37,7 +37,7 @@ router.patch('/profile', async (req, res) => {
       return res.status(400).json({ error: 'The profile photo is not a valid JPEG.' });
     }
   }
-  const { rows } = await pool.query(`UPDATE users SET name=$1,avatar=CASE WHEN $2 THEN $3 ELSE avatar END
+  const { rows } = await pool.write(`UPDATE users SET name=$1,avatar=CASE WHEN $2 THEN $3 ELSE avatar END
     WHERE user_id=$4 RETURNING user_id,name,email,role,avatar,created_at`, [name.trim(), avatar !== undefined, avatar ?? null, req.user.user_id]);
   res.json({ user: rows[0] });
 });
@@ -65,6 +65,7 @@ router.put('/password', async (req, res) => {
     await client.query('UPDATE users SET password_hash=$1 WHERE user_id=$2', [`scrypt:${nextSalt}:${nextKey.toString('hex')}`, req.user.user_id]);
     const token = (req.headers.cookie || '').split(';').map(p => p.trim()).find(p => p.startsWith('chitraverse_session='))?.slice('chitraverse_session='.length) || '';
     await client.query('DELETE FROM user_session WHERE user_id=$1 AND token_hash<>$2', [req.user.user_id, createHash('sha256').update(token).digest('hex')]);
+    await client.query('DELETE FROM password_reset WHERE user_id=$1', [req.user.user_id]);
     await client.query('COMMIT');
     res.json({ updated: true });
   } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -75,8 +76,12 @@ router.get('/activity', async (req, res) => {
   const offset = Number(req.query.offset || 0);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) return res.status(400).json({ error: 'Invalid pagination.' });
   const { rows } = await pool.query(`SELECT * FROM (
-    SELECT 'rating' AS kind,r.review_id::text AS id,m.title,r.title_id,r.rating::text AS detail,r.created_at AS occurred_at
+    SELECT 'rating' AS kind,a.activity_id::text AS id,a.title,a.title_id,a.detail,a.occurred_at
+      FROM activity_log a WHERE a.user_id=$1
+    UNION ALL SELECT 'rating','legacy:'||r.review_id,m.title,r.title_id,
+      'Previously saved rating: ' || r.rating || '/10 (before history tracking)',r.created_at
       FROM review r JOIN media m USING(title_id) WHERE r.user_id=$1 AND r.rating IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM activity_log a WHERE a.user_id=r.user_id AND a.title_id=r.title_id)
     UNION ALL SELECT 'favorite',f.favourite_id::text,m.title,f.title_id,NULL,f.added_at FROM favourite f JOIN media m USING(title_id) WHERE f.user_id=$1
     UNION ALL SELECT 'playlist',w.watchlist_id::text||':'||wi.title_id,m.title,wi.title_id,w.name,wi.added_at
       FROM watchlist w JOIN watchlist_item wi USING(watchlist_id) JOIN media m USING(title_id) WHERE w.user_id=$1

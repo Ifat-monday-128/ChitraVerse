@@ -1,6 +1,6 @@
 ﻿# ChitraVerse
 
-For the completed checklist features, TMDB-link imports, and Gmail OTP setup, see [Checklist and setup guide](information/CHECKLIST_AND_SETUP.md). Catalog browsing is public; account features and admin operations require sign-in.
+For the implemented project features, TMDB-link imports, and Gmail OTP setup, see [Features and setup guide](information/FEATURES_AND_SETUP.md). Catalog browsing is public; account features and admin operations require sign-in.
 
 ChitraVerse is a movie and TV series discovery application built with React, an Express API, and PostgreSQL. TMDB supplies catalog metadata; a separate web-search workflow discovers YouTube trailers. Users can browse titles, search by title or actor, inspect details and episodes, and maintain a private watchlist.
 

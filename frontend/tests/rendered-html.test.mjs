@@ -19,6 +19,7 @@ test("built homepage supports browsing without a mandatory login", async () => {
   assert.match(html, /Loading your movie library/);
   assert.doesNotMatch(html, /Interstellar|Breaking Bad|Stranger Things|interstellar-hero|13\+/);
   assert.match(html, /aria-label="Search the library"/);
+  assert.match(html, />Movies<\/button><button[^>]*>Awards<\/button>/);
 
   const assets = await readdir(new URL("../dist/client/", import.meta.url));
   assert.ok(!assets.includes("interstellar-hero.jpg"));

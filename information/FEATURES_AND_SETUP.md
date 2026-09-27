@@ -1,4 +1,4 @@
-# Checklist implementation and new features
+# Project features and setup
 
 ## Gmail password reset setup
 
@@ -42,10 +42,10 @@ Import jobs run inside the API process. Keep the server running; a restart loses
 
 ## Evaluation demonstration
 
-| Checklist | Implementation and demonstration |
+| Requirement | Implementation and demonstration |
 | --- | --- |
 | Own authentication | `account.routes.js`: database email/password lookup, scrypt comparison, database role, signed HTTP-only JWT cookie with revocable `user_session` record. Demonstrate user/admin login and logout. |
-| Authentication coverage | Catalog browsing and published stories are public, as requested. Private account features and admin operations verify sessions on the backend. The checklist wording requiring authentication on every page is intentionally not applied to public browsing. |
+| Authentication coverage | Catalog browsing and published stories are public, as requested. Private account features and admin operations verify sessions on the backend. The requirement for authentication on every page is intentionally not applied to public browsing. |
 | Explicit DML transactions | `config/db.js`: `withTransaction()` runs BEGIN/COMMIT/ROLLBACK on one connection; `write()` wraps standalone writes. Existing multi-step routes retain their explicit transaction blocks. Import scripts also use explicit writes. |
 | Trigger | `review_rating_activity` invokes `log_review_rating_change()` when a rating changes and writes `activity_log` in the same transaction. Demonstrate rating then changing a title's score. |
 | Computed-value function | `get_title_rating(title_id)` returns the mean user rating and vote count. The save-rating endpoint calls it. |

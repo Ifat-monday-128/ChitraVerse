@@ -24,6 +24,6 @@ pool.withTransaction = async function withTransaction(work) {
     throw error;
   } finally { client.release(); }
 };
-// Standalone writes also use explicit transaction control for the course checklist.
+// Standalone writes also use explicit transaction control for the course requirements.
 pool.write = (sql, values) => pool.withTransaction(client => client.query(sql, values));
 module.exports = pool;

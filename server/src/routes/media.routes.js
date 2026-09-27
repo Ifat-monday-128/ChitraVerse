@@ -3,6 +3,7 @@ const mediaController = require("../controllers/media.controller");
 
 const router = express.Router();
 const pool = require('../config/db');
+router.use(require('./awards.routes'));
 
 // Catalog and published stories are public; account writes remain authenticated.
 router.get('/community', async (req, res) => {

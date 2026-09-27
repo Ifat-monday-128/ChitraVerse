@@ -16,6 +16,7 @@ import { TitleFilterPanel, emptyFilters, filterParams, readFilters, type TitleFi
 import HeaderSearch from "./header-search";
 import useMarqueeSpeed from './use-marquee-speed';
 import HomeDiscovery from './home-discovery';
+import Awards, { TitleAwards } from './awards';
 import AuthScreen from './auth-screen';
 import BrandWordmark from './brand-wordmark';
 import MenuDrawer from './menu-drawer';
@@ -26,7 +27,7 @@ import MediaComments from './media-comments';
 import AnimatedDisclosure from './animated-disclosure';
 import { api, ApiError, posterUrl, sessionExpiredEvent, trailerEmbedUrl, type Media, type Results, type User } from "./api";
 
-type Route = TitleFilters & { view: "home" | "browse" | "search" | "watchlist" | "favorites" | "cast" | "community" | "dashboard"; listId: number | null; collection: string; q: string; seed: string };
+type Route = TitleFilters & { view: "awards" | "home" | "browse" | "search" | "watchlist" | "favorites" | "cast" | "community" | "dashboard"; listId: number | null; collection: string; q: string; seed: string };
 const home: Route = { ...emptyFilters, view: "home", listId: null, collection: "all", q: "", seed: "" };
 const newShuffleSeed = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
 const message = (error: unknown) => error instanceof ApiError ? error.message : "Cannot reach the library. Check your connection and try again.";
@@ -150,7 +151,7 @@ export default function Home() {
       setRoute({
         ...readFilters(params),
         sort, seed, listId: readId("list"),
-        view: ["browse", "search", "watchlist", "favorites", "cast", "community", "dashboard"].includes(view || "") ? view as Route["view"] : "home",
+        view: ["awards", "browse", "search", "watchlist", "favorites", "cast", "community", "dashboard"].includes(view || "") ? view as Route["view"] : "home",
         type: ["movie", "series"].includes(params.get("type") || "") ? params.get("type")! : "all",
         collection: params.get("collection") === "hollywood" ? "hollywood" : "all", q: (params.get("q") || "").slice(0, 120)
       });
@@ -177,7 +178,7 @@ export default function Home() {
     return () => { window.removeEventListener(sessionExpiredEvent, expired); channel?.close(); };
   }, []);
   useEffect(() => {
-    if (!ready || ["cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view)) return;
+    if (!ready || ["awards", "cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view)) return;
     const controller = new AbortController();
     // Reset data when synchronizing with a new API request, including browser Back.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -292,12 +293,14 @@ export default function Home() {
       {!isSearchPage && <nav className="category-tabs" aria-label="Media categories"><button className={isHome ? "active" : ""} onClick={() => go()}>Home</button>
         <button className={isDirectory && route.view === "browse" && route.type === "series" ? "active" : ""} onClick={() => go({ view: "browse", type: "series" })}>TV Shows</button>
         <button className={isDirectory && route.view === "browse" && route.type === "movie" ? "active" : ""} onClick={() => go({ view: "browse", type: "movie" })}>Movies</button>
+        <button className={isDirectory && route.view === "awards" ? "active" : ""} onClick={() => go({ view: "awards" })}>Awards</button>
         <button className={isDirectory && route.view === "cast" ? "active" : ""} onClick={() => go({ view: "cast" })}>Cast</button>
         <button className={isDirectory && route.view === "community" ? "active" : ""} onClick={() => go({ view: "community" })}>Community</button></nav>}
     </section>}
+    {isDirectory && route.view === "awards" && <Awards openTitle={openTitle} />}
     {route.view === "cast" && <div hidden={!isDirectory}><CastDirectory query={route.q} search={q => go({ view: "cast", q })} openPerson={openPerson} /></div>}
     {companyId !== null && personId === null && <section hidden={detailId !== null} className="content-page" key={`company-${companyId}`}><button className="back-button" onClick={back}>← Back</button><ProductionProfile key={companyId} id={companyId} renderItems={titles => <div className="media-grid">{titles.map((item, index) => <Card key={item.title_id} item={item} index={index} open={openTitle} />)}</div>} /></section>}
-    {isDirectory && !["cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view) && <section className="rail-section"><div className="section-heading"><div><p>{isHome ? "FROM YOUR LIBRARY" : <>EXPLORE <BrandWordmark /></>}</p><h2>{isHome ? "Hollywood movies" : heading}</h2></div>
+    {isDirectory && !["awards", "cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view) && <section className="rail-section"><div className="section-heading"><div><p>{isHome ? "FROM YOUR LIBRARY" : <>EXPLORE <BrandWordmark /></>}</p><h2>{isHome ? "Hollywood movies" : heading}</h2></div>
       {isHome && items.length > 0 && <button aria-label="View all Hollywood movies" onClick={() => go({ view: "browse", type: "movie", collection: "hollywood" })}>→</button>}</div>
       {!isHome && route.view !== "search" && <AnimatedDisclosure key={route.view} kind="search" label={route.view === 'watchlist' ? 'Search your watchlist' : 'Search movies & series'}><form className="search-form" role="search" onSubmit={(event) => { event.preventDefault(); setRetry((current) => current + 1); }}>
         <label htmlFor="library-search">Search titles or actors</label><div className="search-field"><input id="library-search" type="search" value={route.q} maxLength={120} placeholder="Movie, TV show, actor or actress…" onChange={event => changeSearch(event.target.value)} /><button className="primary-button" type="submit">Search</button></div>
@@ -331,6 +334,7 @@ export default function Home() {
     {menu && <MenuDrawer close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} user={user} profile={() => user ? go({view:'dashboard'}) : setAccount(true)} items={[
       { label: 'Home · Hollywood', icon: 'home', active: isHome, action: () => go() },
       { label: 'All movies', icon: 'movies', active: isDirectory && route.view === 'browse' && route.type === 'movie', action: () => go({ view: 'browse', type: 'movie' }) },
+      { label: 'Awards', icon: 'movies', active: isDirectory && route.view === 'awards', action: () => go({ view: 'awards' }) },
       { label: 'TV shows', icon: 'tv', active: isDirectory && route.view === 'browse' && route.type === 'series', action: () => go({ view: 'browse', type: 'series' }) },
       { label: 'Search the library', icon: 'search', active: isDirectory && route.view === 'search', action: () => go({ view: 'search' }) },
       { label: 'Cast & crew', icon: 'people', active: isDirectory && route.view === 'cast', action: () => go({ view: 'cast' }) },
@@ -351,6 +355,7 @@ export default function Home() {
           setFeaturedItems(current => current.map(item => item.title_id === detail.title_id ? { ...item, ...data } : item));
         }} signIn={() => setAccount(true)} />
         <TrailerPlayer key={detail.title_id} item={detail} autoPlay={trailerTitleId === detail.title_id} />
+        <TitleAwards key={detail.title_id} titleId={detail.title_id} />
         <MediaComments key={`comments-${detail.title_id}-${user?.user_id ?? "guest"}`} id={detail.title_id} user={user} signIn={()=>setAccount(true)} />
         {!!detail.cast_crew?.length && <><h3>Cast &amp; crew</h3><ul className="cast-grid">{detail.cast_crew.map((person, index) => <li key={`${person.cast_crew_id}-${person.role_type}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
           <button className="cast-card" onClick={() => openPerson(person.cast_crew_id)}><div className="cast-photo"><PersonPhoto name={person.name} photo={person.photo} /></div><strong>{person.name}</strong><small>{person.role_type}</small><span>View profile →</span></button></li>)}</ul></>}

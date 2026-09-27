@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type Media, type User } from "./api";
 import BrandWordmark from './brand-wordmark';
+import RatingPicker from './rating-picker';
 
 const errorMessage = (error: unknown) => error instanceof ApiError ? error.message : "Could not connect. Please try again.";
 
@@ -37,9 +38,7 @@ export function MovieRating({ movie, user, updated, signIn }: { movie: Media; us
     <h3><BrandWordmark /> rating</h3>
     <p>{movie.chitraverse_vote_count ? `${movie.chitraverse_rating}/10 · ${movie.chitraverse_vote_count} votes` : "No ratings yet. Be the first to rate this title."}</p>
     {user?.role === "user" && <form onSubmit={submit} className="detail-actions">
-      <label className="filter-label">Your rating<select required value={rating} disabled={loading || busy} onChange={event => { setRating(event.target.value); setSaved(false); }}>
-        <option value="">Choose a rating</option>{Array.from({ length: 10 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}/10</option>)}
-      </select></label>
+      <RatingPicker value={rating} disabled={loading || busy} onChange={value => { setRating(value); setSaved(false); }} />
       <button className="primary-button" disabled={loading || busy || !rating}>{busy ? "Saving…" : "Save rating"}</button>
     </form>}
     {!user && <button className="secondary-button" onClick={signIn}>Sign in to rate</button>}

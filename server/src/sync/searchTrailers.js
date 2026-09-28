@@ -1,3 +1,4 @@
+const queries = require('./searchTrailers.queries');
 // Searches public YouTube result pages; does not import TMDB video links.
 // Run with --apply to save verified matches, otherwise only writes a report.
 require("../config/env");
@@ -79,11 +80,7 @@ async function main() {
   const provider = process.argv.includes("--provider=bing") ? "bing" : "youtube";
   const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
   const limit = limitArg ? Number(limitArg.split("=")[1]) : Infinity;
-  const { rows } = await pool.query(`SELECT m.title_id, m.title, m.trailer_link,
-      EXTRACT(YEAR FROM COALESCE(mo.release_date, s.first_air_date))::int AS year,
-      CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'TV series' END AS type
-    FROM media m LEFT JOIN movie mo USING(title_id) LEFT JOIN series s USING(title_id)
-    WHERE ($1 OR m.trailer_link IS NOT NULL) ORDER BY m.title_id`, [all]);
+  const { rows } = await pool.query(queries.titlesNeedingTrailers, [all]);
   await fs.mkdir(dataDirectory, { recursive: true });
   const backup = path.join(dataDirectory, `trailers-backup-${Date.now()}.json`);
   await fs.writeFile(backup, JSON.stringify(rows, null, 2));
@@ -115,7 +112,7 @@ async function main() {
         const suffix = match ? `watch?v=${match.id}` : null;
         report[row.title_id] = { title: row.title, query, provider, status: match ? "matched" : "unmatched", checked_at: new Date().toISOString(), match, candidates: videos.slice(0, 4), applied: false };
         if (apply && match) {
-          const result = await pool.write("UPDATE media SET trailer_link=$1 WHERE title_id=$2 AND trailer_link IS NOT DISTINCT FROM $3", [suffix, row.title_id, row.trailer_link]);
+          const result = await pool.write(queries.updateTrailerIfUnchanged, [suffix, row.title_id, row.trailer_link]);
           report[row.title_id].applied = result.rowCount === 1;
         }
         consecutiveErrors = 0;

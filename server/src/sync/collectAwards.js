@@ -1,3 +1,4 @@
+const queries = require('./collectAwards.queries');
 // Wikidata structured statements are CC0. Fetch facts, never generate awards.
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -34,18 +35,14 @@ function awardFields(label) {
 }
 async function main() {
   await fs.mkdir(cache,{recursive:true});
-  const catalog=(await pool.query(`SELECT m.title_id,m.tmdb_id,m.title,
-    to_char(COALESCE(mo.release_date,s.first_air_date),'YYYY-MM-DD') AS release_date,
-    CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'series' END AS media_type
-    FROM media m LEFT JOIN movie mo USING(title_id) LEFT JOIN series s USING(title_id)
-    WHERE mo.title_id IS NOT NULL OR s.title_id IS NOT NULL`)).rows;
+  const catalog=(await pool.query(queries.catalogTitles)).rows;
   const today=new Date().toISOString().slice(0,10), selected=[];
   for(const [type,property,file] of [['movie','P4947','movie'],['series','P4983','tv']]) {
     const filePath=path.join(cache,`wikidata-${file}-awards.json`);
     let data;
     if(process.argv.includes('--from-cache'))data=JSON.parse(await fs.readFile(filePath,'utf8'));
     else {
-      const query=`SELECT ?item ?tmdb ?award ?date ?statement WHERE { ?item wdt:${property} ?tmdb; p:P166 ?statement. ?statement ps:P166 ?award. FILTER NOT EXISTS { ?statement wikibase:rank wikibase:DeprecatedRank } OPTIONAL { ?statement pq:P585 ?date } }`;
+      const query=queries.wikidataAwards(property);
       data=await json('https://query.wikidata.org/sparql?'+new URLSearchParams({query,format:'json'}));
       await fs.writeFile(filePath,JSON.stringify(data));
     }

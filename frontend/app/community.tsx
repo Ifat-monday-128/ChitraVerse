@@ -1,4 +1,5 @@
 "use client";
+import Image from 'next/image';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Dialog from './dialog';
 import { api, ApiError, type User } from './api';
@@ -71,7 +72,7 @@ export default function Community({user,signIn,sessionExpired,openTitle,openPers
     }catch(e){setError(errorText(e));}finally{setLoadingMore(false);}
   }
   return <section className="content-page community-page">
-    <header className="community-hero"><p className="eyebrow">FOR THE LOVE OF CINEMA</p><h1>CVcommunity<span>.</span></h1><p>A film that stayed with you. A scene worth talking about.<br />Every perspective has a place here.</p><span className="community-hero-note">YOUR STORIES. OUR SHARED SCREEN.</span></header>
+    <header className="community-hero"><Image className="community-logo" src="/community.svg" width={80} height={80} alt="" unoptimized /><p className="eyebrow">FOR THE LOVE OF CINEMA</p><h1>CVcommunity<span>.</span></h1><p>A film that stayed with you. A scene worth talking about.<br />Every perspective has a place here.</p><span className="community-hero-note">YOUR STORIES. OUR SHARED SCREEN.</span></header>
     <div className="community-layout"><div className="community-feed">
       <div className="community-start"><div className="community-start-row"><span className="community-self-avatar" aria-hidden="true">{user?.avatar?<img src={user.avatar} alt="" />:user?user.name.slice(0,2).toUpperCase():'CV'}</span><button ref={trigger} className="community-prompt" onClick={openComposer} aria-haspopup="dialog">What&apos;s on your mind{user?`, ${user.name.split(' ')[0]}`:''}?</button><button className="community-write-icon" aria-label="Write a blog" onClick={openComposer}>✎</button></div><div className="community-start-footer"><span>Good cinema deserves a conversation.</span><button onClick={openComposer}>Share a story <span aria-hidden="true">↗</span></button></div></div>
       {success&&<p className="publish-success community-success" role="status">{success}</p>}
@@ -81,7 +82,7 @@ export default function Community({user,signIn,sessionExpired,openTitle,openPers
       <div className="community-posts" aria-busy={loadingMore}>{posts.map(p=><CommunityStory key={p.post_id} post={p} openTitle={openTitle} openPerson={openPerson} openGenre={openGenre} />)}</div>
       {hasMore&&<button className="secondary-button community-more" disabled={loadingMore||busy||loading} onClick={more}>{loadingMore?'Loading stories…':'Load more stories'}</button>}
       {!hasMore&&posts.length>0&&!loading&&<p className="community-feed-end">You&apos;re all caught up. There&apos;s always another story to tell.</p>}
-    </div><aside className="community-aside"><p className="eyebrow">A PLACE TO BELONG</p><h2>More than a watchlist.</h2><p>Discover what other film lovers are watching, thinking, and writing about.</p><div><span>01</span><p><strong>Make it personal</strong>A thoughtful review or a small discovery. Your voice matters.</p></div><div><span>02</span><p><strong>Connect the story</strong>Tag a film, a creator, or a genre to help others explore.</p></div><div><span>03</span><p><strong>Keep it kind</strong>Welcome different opinions. Give spoilers a heads-up.</p></div><button className="text-button" onClick={openComposer}>Join the conversation ↗</button></aside></div>
+    </div></div>
     {composer&&user&&<Dialog title="Create a community story" close={closeComposer}><form className="community-form" onSubmit={submit} aria-busy={busy}><p className="eyebrow">YOUR VOICE, YOUR STORY</p><h2>Write a blog</h2><p className="composer-hint">A review, a discovery, a different perspective. Make it yours.</p>
       <fieldset disabled={busy} className="composer-fields"><label>Title<input autoFocus required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Give your story a title" aria-describedby="blog-title-count" maxLength={200}/></label><small className="character-count" id="blog-title-count">{title.length} / 200 characters</small><label>Your story<textarea required value={content} onChange={e=>setContent(e.target.value)} placeholder="What has you thinking about cinema?" aria-describedby="blog-content-count" maxLength={10000}/></label><small className="character-count" id="blog-content-count">{content.length.toLocaleString()} / 10,000 characters</small>
       <button type="button" className="composer-tag-toggle" aria-expanded={showTags} aria-controls="community-tag-options" onClick={()=>setShowTags(value=>!value)}><span>Add to your story</span><span>Film · Cast / crew · Genre <b aria-hidden="true">{showTags?'−':'+'}</b></span></button>

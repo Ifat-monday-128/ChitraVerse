@@ -1,3 +1,4 @@
+const queries = require('./enrichAll.queries');
 require("../config/env");
 
 const pool = require("../config/db");
@@ -9,27 +10,17 @@ const delay = (milliseconds) => new Promise((resolve) => {
 
 async function linkPerson(titleId, person, roleType) {
   const result = await pool.write(
-    `INSERT INTO cast_crew (tmdb_id, name, photo)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (tmdb_id)
-     DO UPDATE SET name = EXCLUDED.name, photo = EXCLUDED.photo
-     RETURNING cast_crew_id`,
+    queries.insertCastCrew,
     [person.id, person.name, person.profile_path || null],
   );
 
   const roleResult = await pool.write(
-    `INSERT INTO role (role_name)
-     VALUES ($1)
-     ON CONFLICT (role_name)
-     DO UPDATE SET role_name = EXCLUDED.role_name
-     RETURNING role_id`,
+    queries.insertRole,
     [roleType],
   );
 
   await pool.write(
-    `INSERT INTO media_cast_crew (title_id, cast_crew_id, role_id)
-     VALUES ($1, $2, $3)
-     ON CONFLICT DO NOTHING`,
+    queries.insertMediaCastCrew,
     [
       titleId,
       result.rows[0].cast_crew_id,
@@ -50,14 +41,7 @@ async function linkCastAndCompanies(titleId, credits = {}, companies = []) {
 
   for (const company of companies) {
     const result = await pool.write(
-      `INSERT INTO production_house (tmdb_id, name, country, logo)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (tmdb_id)
-       DO UPDATE SET
-         name = EXCLUDED.name,
-         country = EXCLUDED.country,
-         logo = EXCLUDED.logo
-       RETURNING company_id`,
+      queries.insertProductionHouse,
       [
         company.id,
         company.name,
@@ -67,9 +51,7 @@ async function linkCastAndCompanies(titleId, credits = {}, companies = []) {
     );
 
     await pool.write(
-      `INSERT INTO media_company (title_id, company_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
+      queries.insertMediaCompany,
       [titleId, result.rows[0].company_id],
     );
   }
@@ -81,15 +63,11 @@ async function enrichMovie(titleId, tmdbId) {
   });
 
   await pool.write(
-    `UPDATE media
-     SET budget = $1
-     WHERE title_id = $2`,
+    queries.updateMedia,
     [data.budget || null, titleId],
   );
   await pool.write(
-    `UPDATE movie
-     SET runtime = $1, box_office_gross = $2
-     WHERE title_id = $3`,
+    queries.updateMovie,
     [data.runtime || null, data.revenue || null, titleId],
   );
   await linkCastAndCompanies(titleId, data.credits, data.production_companies);
@@ -99,11 +77,7 @@ async function enrichMovie(titleId, tmdbId) {
 
 async function upsertSeasonAndEpisodes(titleId, tmdbId, seasonSummary) {
   const seasonResult = await pool.write(
-    `INSERT INTO season (title_id, season_number)
-     VALUES ($1, $2)
-     ON CONFLICT (title_id, season_number)
-     DO UPDATE SET season_number = EXCLUDED.season_number
-     RETURNING season_id`,
+    queries.insertSeason,
     [titleId, seasonSummary.season_number],
   );
   const seasonId = seasonResult.rows[0].season_id;
@@ -113,14 +87,7 @@ async function upsertSeasonAndEpisodes(titleId, tmdbId, seasonSummary) {
 
   for (const episode of data.episodes || []) {
     await pool.write(
-      `INSERT INTO episode
-         (season_id, title, episode_number, runtime, air_date)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (season_id, episode_number)
-       DO UPDATE SET
-         title = EXCLUDED.title,
-         runtime = EXCLUDED.runtime,
-         air_date = EXCLUDED.air_date`,
+      queries.insertEpisode,
       [
         seasonId,
         episode.name,
@@ -138,9 +105,7 @@ async function enrichTV(titleId, tmdbId) {
   });
 
   await pool.write(
-    `UPDATE series
-     SET status = $1, last_air_date = $2
-     WHERE title_id = $3`,
+    queries.updateSeries,
     [data.status || null, data.last_air_date || null, titleId],
   );
 
@@ -171,18 +136,12 @@ async function enrichRows(rows, enrich) {
 async function main() {
   try {
     const movies = await pool.query(
-      `SELECT media.title_id, media.tmdb_id
-       FROM media
-       JOIN movie ON movie.title_id = media.title_id
-       WHERE media.tmdb_id IS NOT NULL`,
+      queries.moviesToEnrich,
     );
     await enrichRows(movies.rows, enrichMovie);
 
     const shows = await pool.query(
-      `SELECT media.title_id, media.tmdb_id
-       FROM media
-       JOIN series ON series.title_id = media.title_id
-       WHERE media.tmdb_id IS NOT NULL`,
+      queries.seriesToEnrich,
     );
     await enrichRows(shows.rows, enrichTV);
 

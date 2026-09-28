@@ -1,3 +1,4 @@
+const queries = require('../queries/media.queries');
 const express = require("express");
 const mediaController = require("../controllers/media.controller");
 
@@ -9,11 +10,7 @@ router.use(require('./awards.routes'));
 router.get('/community', async (req, res) => {
   const offset = Number(req.query.offset || 0);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) return res.status(400).json({ error: 'Invalid pagination.' });
-  const { rows } = await pool.query(`SELECT p.post_id,p.title,p.content,p.created_at,p.media_id,p.cast_crew_id,p.genre_id,u.name,
-    m.title AS media_title,c.name AS cast_name,g.name AS genre_name
-    FROM community_post p JOIN users u USING(user_id) LEFT JOIN media m ON m.title_id=p.media_id
-    LEFT JOIN cast_crew c USING(cast_crew_id) LEFT JOIN genre g USING(genre_id)
-    ORDER BY p.created_at DESC,p.post_id DESC LIMIT 21 OFFSET $1`, [offset]);
+  const { rows } = await pool.query(queries.selectPostIdCommunityPost, [offset]);
   res.json({ posts: rows.slice(0,20), hasMore: rows.length > 20 });
 });
 
@@ -21,9 +18,8 @@ router.get('/:titleId/comments', async (req, res, next) => {
   try {
     const id = Number(req.params.titleId);
     if (!Number.isInteger(id) || id < 1 || id > 2147483647) return res.status(400).json({ error: 'Invalid title ID' });
-    if (!(await pool.query('SELECT 1 FROM media WHERE title_id=$1', [id])).rowCount) return res.status(404).json({ error: 'Media not found.' });
-    const { rows } = await pool.query(`SELECT c.comment_id,c.content,c.created_at,u.user_id,u.name
-      FROM media_comment c JOIN users u USING(user_id) WHERE c.title_id=$1 ORDER BY c.created_at DESC,c.comment_id DESC`, [id]);
+    if (!(await pool.query(queries.selectMedia, [id])).rowCount) return res.status(404).json({ error: 'Media not found.' });
+    const { rows } = await pool.query(queries.selectCommentIdMediaComment, [id]);
     res.json({ comments: rows });
   } catch (e) { next(e); }
 });
@@ -63,10 +59,10 @@ router.get('/filters', async (req, res, next) => {
   try {
     const pool = require('../config/db');
     const results = await Promise.all([
-      pool.query('SELECT genre_id,name FROM genre ORDER BY name'),
-      pool.query("SELECT DISTINCT language FROM media WHERE language ~ '^[a-z]{2,3}$' ORDER BY language"),
-      pool.query("SELECT DISTINCT country FROM production_house WHERE country ~ '^[A-Z]{2}$' ORDER BY country"),
-      pool.query('SELECT role_id,role_name FROM role ORDER BY role_name'),
+      pool.query(queries.selectGenreIdGenre),
+      pool.query(queries.selectLanguageMedia),
+      pool.query(queries.selectCountryProductionHouse),
+      pool.query(queries.selectRoleIdRole),
     ]);
     res.json({ genres: results[0].rows, languages: results[1].rows.map(item=>item.language), countries: results[2].rows.map(item=>item.country), roles: results[3].rows });
   } catch (error) { next(error); }

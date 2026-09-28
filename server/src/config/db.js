@@ -1,3 +1,4 @@
+const queries = require('../queries/transactions.queries');
 require("./env");
 
 const { Pool } = require("pg");
@@ -15,12 +16,12 @@ const pool = new Pool({
 pool.withTransaction = async function withTransaction(work) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query(queries.begin);
     const result = await work(client);
-    await client.query('COMMIT');
+    await client.query(queries.commit);
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query(queries.rollback);
     throw error;
   } finally { client.release(); }
 };

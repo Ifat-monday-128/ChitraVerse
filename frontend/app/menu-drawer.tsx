@@ -1,7 +1,7 @@
 "use client";
+import BrandWordmark from './brand-wordmark';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import BrandWordmark from './brand-wordmark';
 import './menu-drawer.css';
 
 export type MenuItem = { label: string; icon: string; active?: boolean; action: () => void };

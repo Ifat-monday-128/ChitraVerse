@@ -5,6 +5,7 @@ import "./brand-wordmark.css";
 export const metadata: Metadata = {
   title: "ChitraVerse",
   description: "Discover movies and series in ChitraVerse.",
+  icons: { icon: [{ url: '/icon.svg', type: 'image/svg+xml' }] },
 };
 
 export default function RootLayout({

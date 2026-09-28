@@ -1,10 +1,10 @@
 "use client";
+import BrandWordmark from './brand-wordmark';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import './auth-screen.css';
 import PasswordReset from './password-reset';
 import AuthPosters from './auth-posters';
-import BrandWordmark from './brand-wordmark';
 
 type AuthScreenProps = {
   requiredSignIn?: boolean;

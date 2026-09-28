@@ -1,3 +1,4 @@
+const queries = require('./queries/transactions.queries');
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const pool = require("./config/db");
@@ -7,12 +8,12 @@ async function migrate() {
   for (const file of (await fs.readdir(directory)).filter((file) => file.endsWith(".sql")).sort()) {
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await client.query(queries.begin);
       await client.query(await fs.readFile(path.join(directory, file), "utf8"));
-      await client.query("COMMIT");
+      await client.query(queries.commit);
       console.log(`Applied ${file}`);
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query(queries.rollback);
       throw error;
     } finally { client.release(); }
   }

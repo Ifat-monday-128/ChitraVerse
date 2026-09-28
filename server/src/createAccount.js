@@ -1,3 +1,4 @@
+const queries = require('./createAccount.queries');
 // Local administrator command. Public registration always assigns the user role.
 const { randomBytes, scrypt } = require("node:crypto");
 const { promisify } = require("node:util");
@@ -14,7 +15,7 @@ async function createAccount() {
   const salt = randomBytes(16).toString("hex");
   const key = await promisify(scrypt)(password, salt, 64);
   await pool.write(
-    "INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)",
+    queries.insertUsers,
     [name.trim(), email, `scrypt:${salt}:${key.toString("hex")}`, role],
   );
   console.log(`Account created. Email: ${email}\nRole: ${role}\nPassword: ${password}\nSave this password; it is shown only now.`);

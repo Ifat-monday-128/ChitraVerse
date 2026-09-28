@@ -5,7 +5,9 @@ const accountRoutes = require("./routes/account.routes");
 
 const app = express();
 
-const origins = (process.env.FRONTEND_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000").split(",").map((value) => value.trim());
+// The local frontend may use 3001 when another dev server already owns 3000.
+const defaultOrigins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001";
+const origins = (process.env.FRONTEND_ORIGINS || defaultOrigins).split(",").map((value) => value.trim());
 app.use(cors({ origin: origins, credentials: true }));
 app.use(express.json({ limit: "64kb" }));
 app.use((req, res, next) => {

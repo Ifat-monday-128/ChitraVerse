@@ -34,7 +34,6 @@ export default function Awards({openTitle}:{openTitle:(id:number)=>void}) {
   function filter(setter:(s:string)=>void,value:string){setter(value);setOffset(0);}
   return <section className="awards-page" aria-labelledby="awards-heading">
     <header className="awards-intro"><div><p className="eyebrow">RECOGNITION IN CINEMA & TELEVISION</p><h1 id="awards-heading">Awards</h1><p>Explore award-winning movies and series from your ChitraVerse library.</p></div>
-      {data&&<div className="awards-stats" aria-label="Awards collection totals"><div><strong>{data.summary.movies}</strong><span>Movies</span></div><div><strong>{data.summary.series}</strong><span>Series</span></div><div><strong>{data.summary.records.toLocaleString()}</strong><span>Sourced records</span></div></div>}
     </header>
     <p className="awards-source-note">Selected, dated awards and honors associated with these titles, recorded in Wikidata. Nominations are excluded; this is not a complete awards history. Each record includes its source.{data?.summary.retrieved_at&&` Collected ${new Date(data.summary.retrieved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}.`}</p>
     <div className="awards-filters"><label>Search<input type="search" value={q} maxLength={120} placeholder="Title, award or category" onChange={e=>filter(setQ,e.target.value)}/></label>

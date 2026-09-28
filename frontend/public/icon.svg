@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">ChitraVerse</title>
+  <desc id="desc">A gold CV cinema monogram on a rounded charcoal square.</desc>
+  <defs>
+    <linearGradient id="gold" x1="96" y1="112" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9DCA5"/>
+      <stop offset="0.52" stop-color="#D0BC7A"/>
+      <stop offset="1" stop-color="#AB914E"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#101313"/>
+  <rect x="16" y="16" width="480" height="480" rx="98" stroke="#D0BC7A" stroke-opacity="0.2" stroke-width="2"/>
+  <path d="M250 162C232 145 210 136 186 136C123 136 80 186 80 256C80 326 123 376 186 376C210 376 232 367 250 350L220 314C210 324 198 329 186 329C153 329 130 300 130 256C130 212 153 183 186 183C198 183 210 188 220 198L250 162Z" fill="url(#gold)"/>
+  <path d="M244 144H296L340 292L384 144H436L362 368H318L244 144Z" fill="url(#gold)"/>
+  <path d="M173 221L224 256L173 291V221Z" fill="url(#gold)"/>
+</svg>

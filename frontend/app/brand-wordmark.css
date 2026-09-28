@@ -17,5 +17,5 @@
 .auth-brand .site-wordmark > span { color: #c7a65f; }
 @media (max-width: 540px) {
   .topbar .brand { min-width: 0; }
-  .topbar .brand > .site-wordmark { font-size: clamp(16px, 4.8vw, 23px); letter-spacing: 0; }
+  .topbar .brand .site-wordmark { font-size: clamp(16px, 4.8vw, 23px); letter-spacing: 0; }
 }

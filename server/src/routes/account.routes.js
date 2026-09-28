@@ -1,3 +1,4 @@
+const queries = require('../queries/account.queries');
 const express = require("express");
 const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
@@ -33,9 +34,7 @@ async function currentUser(req) {
   if (!token) return null;
   const claims = verifyJwt(token);
   if (!claims) return null;
-  const { rows } = await pool.query(`SELECT u.user_id, u.name, u.email, u.role FROM users u
-    JOIN user_session s USING(user_id)
-    WHERE s.token_hash=$1 AND s.expires_at > now() AND u.user_id=$2`, [hashToken(token), Number(claims.sub)]);
+  const { rows } = await pool.query(queries.findSessionUser, [hashToken(token), Number(claims.sub)]);
   return rows[0] || null;
 }
 
@@ -44,25 +43,25 @@ async function createSession(req, res, user, registerUser) {
   const previousToken = sessionToken(req);
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query(queries.begin);
     if (registerUser) user = await registerUser(client);
     else {
       // Serialize login with password resets; an old password cannot create a
       // new session after a concurrent reset has already revoked existing ones.
-      const locked = await client.query('SELECT password_hash FROM users WHERE user_id=$1 FOR UPDATE', [user.user_id]);
+      const locked = await client.query(queries.lockPassword, [user.user_id]);
       if (locked.rows[0]?.password_hash !== user.password_hash) {
-        await client.query('ROLLBACK');
+        await client.query(queries.rollback);
         return res.status(401).json({ error: 'Your password changed. Sign in again.' });
       }
     }
     const issued = createJwt(user.user_id); token = issued.token;
     const expiresAt = issued.expiresAt;
     // Replace this browser's old session when signing in to another account.
-    await client.query("DELETE FROM user_session WHERE expires_at <= now() OR token_hash=$1", [previousToken ? hashToken(previousToken) : null]);
-    await client.query("INSERT INTO user_session(token_hash,user_id,expires_at) VALUES($1,$2,$3)", [hashToken(token), user.user_id, expiresAt]);
-    await client.query("COMMIT");
+    await client.query(queries.deleteExpiredOrPreviousSession, [previousToken ? hashToken(previousToken) : null]);
+    await client.query(queries.createSession, [hashToken(token), user.user_id, expiresAt]);
+    await client.query(queries.commit);
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query(queries.rollback);
     throw error;
   } finally {
     client.release();
@@ -87,7 +86,7 @@ router.use((req, res, next) => { res.set("Cache-Control", "no-store"); next(); }
 router.get("/me", async (req, res) => {
   const user = await currentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in to view your account." });
-  const { rows } = await pool.query('SELECT avatar FROM users WHERE user_id=$1', [user.user_id]);
+  const { rows } = await pool.query(queries.getAvatar, [user.user_id]);
   return res.json({ user: { ...user, avatar: rows[0]?.avatar || null } });
 });
 router.use(['/forgot-password','/reset-password'], throttle);
@@ -103,7 +102,7 @@ router.post("/register", throttle, async (req, res) => {
   const key = await scrypt(password, salt, 64);
   try {
     return await createSession(req, res, null, async client => {
-      const { rows } = await client.query(`INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'user') RETURNING user_id,name,email,role`,
+      const { rows } = await client.query(queries.registerUser,
         [name.trim(), email.trim().toLowerCase(), `scrypt:${salt}:${key.toString("hex")}`]);
       return rows[0];
     });
@@ -118,7 +117,7 @@ router.post("/login", throttle, async (req, res) => {
     || typeof password !== "string" || !password.trim() || password.length > 128) {
     return res.status(400).json({ error: "Enter your email and password." });
   }
-  const { rows } = await pool.query("SELECT user_id,name,email,password_hash,role,avatar FROM users WHERE email=$1", [email.trim().toLowerCase()]);
+  const { rows } = await pool.query(queries.findByEmail, [email.trim().toLowerCase()]);
   const user = rows[0];
   const [format, salt, stored] = (user?.password_hash || "").split(":");
   // Perform a password derivation even for an unknown account.
@@ -132,7 +131,7 @@ router.post("/login", throttle, async (req, res) => {
 });
 router.post("/logout", async (req, res) => {
   const token = sessionToken(req);
-  if (token) await pool.write("DELETE FROM user_session WHERE token_hash=$1", [hashToken(token)]);
+  if (token) await pool.write(queries.revokeSession, [hashToken(token)]);
   res.clearCookie(cookieName, cookieOptions());
   res.json({ user: null });
 });
@@ -149,36 +148,12 @@ router.use(require('./tmdb-import.routes'));
 router.use(require('./admin-management.routes'));
 router.get("/admin/users", async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin access required." });
-  const { rows } = await pool.query(`SELECT u.user_id,u.name,u.email,u.role,u.created_at,
-    COALESCE((SELECT json_agg(activity ORDER BY activity.occurred_at DESC) FROM (
-      SELECT 'rating' AS kind,a.title,a.new_rating AS rating,a.occurred_at,a.detail
-      FROM activity_log a WHERE a.user_id=u.user_id
-      UNION ALL
-      SELECT 'rating',m.title,r.rating,r.created_at,'Previously saved rating: ' || r.rating || '/10 (before history tracking)'
-      FROM review r JOIN media m USING(title_id) WHERE r.user_id=u.user_id AND r.rating IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM activity_log a WHERE a.user_id=r.user_id AND a.title_id=r.title_id)
-      UNION ALL
-      SELECT 'favorite',m.title,NULL,f.added_at,'Added to favorites'
-      FROM favourite f JOIN media m USING(title_id) WHERE f.user_id=u.user_id
-      UNION ALL
-      SELECT 'comment',m.title,NULL,c.created_at,'Commented: ' || LEFT(c.content,160)
-      FROM media_comment c JOIN media m USING(title_id) WHERE c.user_id=u.user_id
-      UNION ALL
-      SELECT 'story',p.title,NULL,p.created_at,'Published a story'
-      FROM community_post p WHERE p.user_id=u.user_id
-      UNION ALL
-      SELECT 'watchlist' AS kind,m.title,NULL AS rating,wi.added_at AS occurred_at,NULL AS detail
-      FROM watchlist w JOIN watchlist_item wi USING(watchlist_id) JOIN media m USING(title_id)
-      WHERE w.user_id=u.user_id
-    ) activity), '[]'::json) AS activities
-    FROM users u ORDER BY u.created_at DESC,u.user_id DESC`);
+  const { rows } = await pool.query(queries.listUsersWithActivity);
   res.json({ users: rows });
 });
 router.get('/admin/homepage', async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
-  const { rows } = await pool.query(`SELECT m.title_id,m.title,m.poster,
-    CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'series' END AS media_type
-    FROM homepage_feature f JOIN media m USING(title_id) LEFT JOIN movie mo USING(title_id) ORDER BY f.position`);
+  const { rows } = await pool.query(queries.listFeaturedTitles);
   res.json({ items: rows });
 });
 router.put('/admin/homepage', async (req, res) => {
@@ -189,46 +164,44 @@ router.put('/admin/homepage', async (req, res) => {
   }
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query('LOCK TABLE homepage_feature IN EXCLUSIVE MODE');
-    const valid = await client.query(`SELECT m.title_id FROM media m WHERE m.title_id=ANY($1::int[])
-      AND (EXISTS(SELECT 1 FROM movie WHERE title_id=m.title_id) OR EXISTS(SELECT 1 FROM series WHERE title_id=m.title_id)) FOR KEY SHARE`, [ids]);
-    if (valid.rowCount !== ids.length) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'One or more selected titles no longer exist.' }); }
-    await client.query('DELETE FROM homepage_feature');
-    await client.query('INSERT INTO homepage_feature(title_id,position) SELECT id,ordinality-1 FROM unnest($1::int[]) WITH ORDINALITY AS entries(id,ordinality)', [ids]);
-    await client.query('COMMIT'); res.json({ saved: true });
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
+    await client.query(queries.begin);
+    await client.query(queries.lockHomepageFeature);
+    const valid = await client.query(queries.validateFeaturedTitles, [ids]);
+    if (valid.rowCount !== ids.length) { await client.query(queries.rollback); return res.status(400).json({ error: 'One or more selected titles no longer exist.' }); }
+    await client.query(queries.deleteHomepageFeature);
+    await client.query(queries.insertHomepageFeature, [ids]);
+    await client.query(queries.commit); res.json({ saved: true });
+  } catch (error) { await client.query(queries.rollback); throw error; }
   finally { client.release(); }
 });
 router.get("/ratings/:titleId", async (req, res) => {
   if (req.user.role !== "user") return res.status(403).json({ error: "Only users can rate titles." });
   const titleId = Number(req.params.titleId);
   if (!Number.isSafeInteger(titleId) || titleId < 1) return res.status(400).json({ error: "Invalid title ID" });
-  const { rows } = await pool.query("SELECT rating FROM review WHERE user_id=$1 AND title_id=$2 ORDER BY created_at DESC,review_id DESC LIMIT 1", [req.user.user_id,titleId]);
+  const { rows } = await pool.query(queries.getUserRating, [req.user.user_id,titleId]);
   res.json({ rating: rows[0]?.rating ?? null });
 });
 router.post('/comments', async (req, res, next) => {
   try {
     const titleId = Number(req.body?.title_id), content = req.body?.content;
     if (!Number.isInteger(titleId) || titleId < 1 || titleId > 2147483647 || typeof content !== 'string' || !content.trim() || content.length > 2000) return res.status(400).json({ error: 'Enter a comment up to 2,000 characters.' });
-    const exists = await pool.query('SELECT 1 FROM media WHERE title_id=$1', [titleId]);
+    const exists = await pool.query(queries.titleExists, [titleId]);
     if (!exists.rowCount) return res.status(404).json({ error: 'Media not found.' });
-    const { rows } = await pool.write(`INSERT INTO media_comment(user_id,title_id,content) VALUES($1,$2,$3)
-      RETURNING comment_id,content,created_at`, [req.user.user_id,titleId,content.trim()]);
+    const { rows } = await pool.write(queries.insertMediaComment, [req.user.user_id,titleId,content.trim()]);
     res.status(201).json({ comment: { ...rows[0], user_id: req.user.user_id, name: req.user.name } });
   } catch (e) { next(e); }
 });
 router.get('/community', async (req, res, next) => {
   const offset = Number(req.query.offset || 0);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) return res.status(400).json({ error: 'Invalid pagination.' });
-  try { const { rows } = await pool.query(`SELECT p.*,u.name, m.title AS media_title, c.name AS cast_name, g.name AS genre_name FROM community_post p JOIN users u USING(user_id) LEFT JOIN media m ON m.title_id=p.media_id LEFT JOIN cast_crew c USING(cast_crew_id) LEFT JOIN genre g USING(genre_id) ORDER BY p.created_at DESC,p.post_id DESC LIMIT 21 OFFSET $1`, [offset]); res.json({ posts: rows.slice(0,20), hasMore: rows.length > 20 }); } catch (e) { next(e); }
+  try { const { rows } = await pool.query(queries.listCommunityPosts, [offset]); res.json({ posts: rows.slice(0,20), hasMore: rows.length > 20 }); } catch (e) { next(e); }
 });
 router.post('/community', async (req, res, next) => {
   try {
     const { title, content, media_id, cast_crew_id, genre_id } = req.body || {};
     if (typeof title !== 'string' || !title.trim() || title.length > 200 || typeof content !== 'string' || !content.trim() || content.length > 10000) return res.status(400).json({ error: 'Add a title and post content.' });
     for (const id of [media_id, cast_crew_id, genre_id]) if (id != null && (!Number.isInteger(id) || id < 1 || id > 2147483647)) return res.status(400).json({ error: 'Choose valid tags from the search results.' });
-    const { rows } = await pool.write(`INSERT INTO community_post(user_id,title,content,media_id,cast_crew_id,genre_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [req.user.user_id,title.trim(),content.trim(),media_id||null,cast_crew_id||null,genre_id||null]);
+    const { rows } = await pool.write(queries.insertCommunityPost, [req.user.user_id,title.trim(),content.trim(),media_id||null,cast_crew_id||null,genre_id||null]);
     res.status(201).json({ post: { ...rows[0], name: req.user.name } });
   } catch (e) { if (e.code === '23503') return res.status(400).json({ error: 'A selected tag no longer exists. Choose another tag.' }); next(e); }
 });
@@ -240,22 +213,22 @@ router.put("/ratings/:titleId", async (req, res) => {
   }
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query(queries.begin);
     // Serialize this user's rating writes without altering the existing review schema.
-    await client.query("SELECT pg_advisory_xact_lock($1)", [req.user.user_id]);
-    if (!(await client.query("SELECT 1 FROM media m WHERE title_id=$1 AND (EXISTS(SELECT 1 FROM movie WHERE title_id=m.title_id) OR EXISTS(SELECT 1 FROM series WHERE title_id=m.title_id)) FOR KEY SHARE", [titleId])).rowCount) {
-      await client.query("ROLLBACK"); return res.status(404).json({ error: "Title not found." });
+    await client.query(queries.lockUserRatings, [req.user.user_id]);
+    if (!(await client.query(queries.lockRateableTitle, [titleId])).rowCount) {
+      await client.query(queries.rollback); return res.status(404).json({ error: "Title not found." });
     }
-    const existing = await client.query("SELECT review_id FROM review WHERE user_id=$1 AND title_id=$2 ORDER BY created_at DESC,review_id DESC", [req.user.user_id,titleId]);
+    const existing = await client.query(queries.findExistingReviews, [req.user.user_id,titleId]);
     if (existing.rowCount) {
       // Preserve any existing review text; only the latest review contributes a vote.
-      await client.query("UPDATE review SET rating=NULL WHERE user_id=$1 AND title_id=$2 AND review_id<>$3 AND rating IS NOT NULL", [req.user.user_id,titleId,existing.rows[0].review_id]);
-      await client.query("UPDATE review SET rating=$1,created_at=now() WHERE review_id=$2", [rating,existing.rows[0].review_id]);
-    } else await client.query("INSERT INTO review(user_id,title_id,rating) VALUES($1,$2,$3)", [req.user.user_id,titleId,rating]);
-    const summary = await client.query("SELECT * FROM get_title_rating($1)", [titleId]);
-    await client.query("COMMIT");
+      await client.query(queries.clearDuplicateRatings, [req.user.user_id,titleId,existing.rows[0].review_id]);
+      await client.query(queries.updateRating, [rating,existing.rows[0].review_id]);
+    } else await client.query(queries.insertRating, [req.user.user_id,titleId,rating]);
+    const summary = await client.query(queries.getRatingSummary, [titleId]);
+    await client.query(queries.commit);
     res.json({ rating, ...summary.rows[0] });
-  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  } catch (error) { await client.query(queries.rollback); throw error; }
   finally { client.release(); }
 });
 router.use("/watchlist", (req, res, next) => {
@@ -267,10 +240,7 @@ router.get('/watchlist/search', (req, res, next) => {
   return require('../controllers/media.controller').browse(req, res, next);
 });
 router.get("/watchlist", async (req, res) => {
-  const { rows } = await pool.query(`SELECT DISTINCT m.title_id, m.title, m.poster, m.tmdb_rating,
-    CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'series' END AS media_type
-    FROM watchlist w JOIN watchlist_item wi USING(watchlist_id) JOIN media m USING(title_id)
-    LEFT JOIN movie mo USING(title_id) WHERE w.user_id=$1 ORDER BY m.title`, [req.user.user_id]);
+  const { rows } = await pool.query(queries.listLegacyWatchlist, [req.user.user_id]);
   res.json({ items: rows });
 });
 // Legacy writes must never silently pick a list or remove from every list.

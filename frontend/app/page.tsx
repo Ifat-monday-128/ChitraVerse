@@ -28,6 +28,7 @@ import './workspace-layout.css';
 import AccountProfile from './account-profile';
 import MediaComments from './media-comments';
 import AnimatedDisclosure from './animated-disclosure';
+import Select from './custom-select';
 import { api, ApiError, posterUrl, sessionExpiredEvent, trailerEmbedUrl, type Media, type Results, type User } from "./api";
 
 type Route = TitleFilters & { view: "awards" | "home" | "browse" | "search" | "watchlist" | "favorites" | "cast" | "community" | "dashboard"; listId: number | null; collection: string; q: string; seed: string };
@@ -283,8 +284,11 @@ export default function Home() {
         <button className="icon-button menu" aria-label="Open menu" aria-expanded={menu} aria-controls="navigation-drawer" aria-haspopup="dialog" onClick={() => setMenu(true)}><i /><i /><i /></button>
         <HeaderSearch active={isDirectory && route.view === 'search'} query={route.q}
           open={() => go({ view: 'search' })} close={() => go()} change={changeSearch} submit={() => setRetry(current => current + 1)} /></div>
-        <Link className="brand" href="/" aria-label="ChitraVerse home" onClick={(event) => { event.preventDefault(); go(); }}><BrandWordmark /></Link>
-        <button className="avatar" aria-label="Open profile" onClick={() => { if (user?.role === "admin") go({ view: "dashboard" }); else setAccount(true); setAccountError(""); }}>{user?.avatar ? <img src={user.avatar} alt="Your profile" /> : user ? user.name.slice(0, 2).toUpperCase() : "CV"}</button>
+        <Link className="brand" href="/" aria-label="ChitraVerse home" onClick={(event) => { event.preventDefault(); go(); }} style={{ display: 'flex', alignItems: 'center' }}>
+          {isHome && <img src="/icon.svg" alt="ChitraVerse Logo" style={{ width: 32, height: 32, marginRight: 10, borderRadius: 8 }} />}
+          <BrandWordmark />
+        </Link>
+        <button className="avatar" aria-label="Open profile" onClick={() => { setAccount(true); setAccountError(""); }}>{user?.avatar ? <img src={user.avatar} alt="Your profile" /> : user ? user.name.slice(0, 2).toUpperCase() : "CV"}</button>
       </header>
       {isHome && <div className="hero-copy" key={hero?.title_id ?? 'loading'}>{loading ? <p role="status">Loading your movie library…</p> : hero ? <>
         <p className="eyebrow">{hero.genres?.map((genre) => genre.name).join(" · ")}</p><h1>{hero.title}</h1>
@@ -303,7 +307,7 @@ export default function Home() {
         <button className={isDirectory && route.view === "browse" && route.type === "movie" ? "active" : ""} onClick={() => go({ view: "browse", type: "movie" })}>Movies</button>
         <button className={isDirectory && route.view === "awards" ? "active" : ""} onClick={() => go({ view: "awards" })}>Awards</button>
         <button className={isDirectory && route.view === "cast" ? "active" : ""} onClick={() => go({ view: "cast" })}>Cast</button>
-        <button className={isDirectory && route.view === "community" ? "active" : ""} onClick={() => go({ view: "community" })}>Community</button></nav>}
+        <button className={isDirectory && route.view === "community" ? "active" : ""} onClick={() => go({ view: "community" })}>CVCommunity</button></nav>}
     </section>}
     {isDirectory && route.view === "awards" && <Awards openTitle={openTitle} />}
     {route.view === "cast" && <div hidden={!isDirectory}><CastDirectory query={route.q} search={q => go({ view: "cast", q })} openPerson={openPerson} /></div>}
@@ -339,15 +343,13 @@ export default function Home() {
     {externalTitle !== null && <section className="content-page title-page" key={externalTitle}><button className="back-button" onClick={back}>← Back</button><ExternalTitle reference={externalTitle} openTitle={openTitle} /></section>}
     {isDirectory && route.view === "community" && <Community key={user?.user_id ?? "guest"} user={user} signIn={()=>setAccount(true)} sessionExpired={expireSession} openTitle={openTitle} openPerson={openPerson} openGenre={id=>go({view:"search",genre:String(id)})} />}
     {isDirectory && route.view === "dashboard" && <Dashboard openPerson={openPerson} openGenre={id=>go({view:'search',genre:String(id)})} user={user} updated={setUser} openTitle={openTitle} openList={id=>go({view:'watchlist',listId:id})} busy={accountBusy} error={accountError} signIn={()=>setAccount(true)} logout={logout} watchlists={()=>go({view:"watchlist"})} favorites={()=>go({view:"favorites"})} community={()=>go({view:"community"})} homepage={()=>setHomepageEditor(true)} activity={()=>setAdminOpen(true)} />}
-    {isDashboard && <button className="workspace-menu secondary-button" onClick={()=>setMenu(true)}>Menu: Site navigation</button>}
     {user?.suspended && <div className="message error" role="alert">Account suspended: {user.suspension_reason}. <button disabled={accountBusy} onClick={logout}>Sign out</button></div>}
-    {moderation && user && <Dialog title="Community moderation" close={()=>{setModeration(false);window.dispatchEvent(new Event("chitraverse:reports-changed"));}}><Moderation user={user}/></Dialog>}
+    {moderation && user && <Dialog title="CVCommunity moderation" close={()=>{setModeration(false);window.dispatchEvent(new Event("chitraverse:reports-changed"));}}><Moderation user={user}/></Dialog>}
     {menu && <MenuDrawer logout={logout} busy={accountBusy} error={accountError} close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} user={user} profile={() => user ? go({view:'dashboard'}) : setAccount(true)} items={[
       { label: 'Home · Hollywood', icon: 'home', active: isHome, action: () => go() },
       { label: 'All movies', icon: 'movies', active: isDirectory && route.view === 'browse' && route.type === 'movie', action: () => go({ view: 'browse', type: 'movie' }) },
       { label: 'Awards', icon: 'movies', active: isDirectory && route.view === 'awards', action: () => go({ view: 'awards' }) },
       { label: 'TV shows', icon: 'tv', active: isDirectory && route.view === 'browse' && route.type === 'series', action: () => go({ view: 'browse', type: 'series' }) },
-      { label: 'Search the library', icon: 'search', active: isDirectory && route.view === 'search', action: () => go({ view: 'search' }) },
       { label: 'Cast & crew', icon: 'people', active: isDirectory && route.view === 'cast', action: () => go({ view: 'cast' }) },
       ...(['admin','moderator'].includes(user?.role || '') ? [{ label: `Reports${unreadReports ? ` (${unreadReports} unread)` : ''}`, icon: 'activity', action: () => setModeration(true) }] : []),
       { label: 'CVcommunity', icon: 'people', active: isDirectory && route.view === 'community', action: () => go({ view: 'community' }) },
@@ -372,18 +374,18 @@ export default function Home() {
         {!!detail.cast_crew?.length && <><h3>Cast &amp; crew</h3><ul className="cast-grid">{detail.cast_crew.map((person, index) => <li key={`${person.cast_crew_id}-${person.role_type}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
           <button className="cast-card" onClick={() => openPerson(person.cast_crew_id)}><div className="cast-photo"><PersonPhoto name={person.name} photo={person.photo} /></div><strong>{person.name}</strong><small>{person.character_name || person.role_type}</small><span>View profile →</span></button></li>)}</ul></>}
         {!!detail.production_companies?.length && <ProductionCredits companies={detail.production_companies} openCompany={openCompany} />}
-        {!!detail.seasons?.length && <><h3>Episodes</h3><label className="filter-label">Season<select value={season} onChange={(event) => setSeason(event.target.value)}>{detail.seasons.map((item) => <option key={item.season_id} value={item.season_number}>Season {item.season_number} · {item.total_episode} episodes</option>)}</select></label>
+        {!!detail.seasons?.length && <><h3>Episodes</h3><label className="filter-label">Season<Select value={season} onChange={(event: any) => setSeason(event.target.value)}>{detail.seasons.map((item) => <option key={item.season_id} value={item.season_number}>Season {item.season_number} · {item.total_episode} episodes</option>)}</Select></label>
           {episodeError && <p role="alert">{episodeError}</p>}{episodesLoading ? <p role="status">Loading episodes…</p> : episodes.length ? <ol className="episodes">{episodes.map((episode) => <li key={episode.ep_id}>{episode.episode_number}. {episode.title}</li>)}</ol> : !episodeError && <p>No episodes are available for this season.</p>}</>}
       </>}
     </section>}
     {adminOpen && user?.role === "admin" && <Dialog title="Users and activity" close={() => setAdminOpen(false)}><AdminUsers /></Dialog>}
     {homepageEditor && user?.role === 'admin' && <Dialog title="Manage homepage" close={() => setHomepageEditor(false)}><AdminHomepage saved={() => { setHomepageEditor(false); go(); setRetry(value => value + 1); }} /></Dialog>}
     {account && !user && <AuthScreen register={register} busy={accountBusy} error={accountError} close={() => setAccount(false)} toggleMode={() => { setRegister(!register); setAccountError(""); }} submit={authenticate} />}
-    {account && user && user.role !== 'admin' && <Dialog title="Your profile" close={() => setAccount(false)}>
+    {account && user && <Dialog title="Your profile" close={() => setAccount(false)}>
       <AccountProfile user={user} updated={setUser} busy={accountBusy} error={accountError} logout={logout}
         favorites={()=>{setAccount(false);go({view:'favorites'});}} watchlists={()=>{setAccount(false);go({view:'watchlist'});}}
         openTitle={id=>{setAccount(false);openTitle(id);}} openList={id=>{setAccount(false);go({view:'watchlist',listId:id});}}
-        community={()=>{setAccount(false);go({view:'community'});}} homepage={()=>{setAccount(false);setHomepageEditor(true);}} activity={()=>{setAccount(false);setAdminOpen(true);}} />
+        community={()=>{setAccount(false);go({view:'community'});}} homepage={()=>{setAccount(false);setHomepageEditor(true);}} activity={()=>{setAccount(false);setAdminOpen(true);}} dashboard={()=>{setAccount(false);go({view:'dashboard'});}} />
     </Dialog>}
   </main></LibraryProvider>;
 }

@@ -7,6 +7,7 @@ import './home-discovery.css';
 import PopularInterests from './popular-interests';
 import Card from './media-card';
 import useMarqueeSpeed from './use-marquee-speed';
+import Select from './custom-select';
 
 type BoxMovie = Media & { box_office_gross: string; budget: string | null };
 type Birthday = { cast_crew_id: number; name: string; photo: string | null; date_of_birth: string; roles: string[] };
@@ -37,7 +38,7 @@ function BoxOffice({ openTitle }: { openTitle: (id: number) => void }) {
   const revenue = Number(movie?.box_office_gross || 0);
   const share = total ? revenue / total * 100 : 0;
   return <section className="discovery-section box-office-section" aria-labelledby="box-office-heading">
-    <div className="discovery-heading"><div><p className="eyebrow">THE BIG PICTURE</p><h2 id="box-office-heading">Box office <span>heavyweights.</span></h2><p>Worldwide lifetime grosses · US dollars · Top 10 in your library</p></div><div className="box-office-filters"><label>Market<select aria-label="Box office market" value="worldwide" onChange={()=>{}}><option value="worldwide">Worldwide</option></select></label><label>Genre<select aria-label="Box office genre" value={genre} onChange={e=>{setGenre(e.target.value);setItems(null);setError(false);}}><option value="">All Genres</option>{genres.map(g=><option key={g.genre_id} value={g.genre_id}>{g.name}</option>)}</select></label></div></div>
+    <div className="discovery-heading"><div><p className="eyebrow">THE BIG PICTURE</p><h2 id="box-office-heading">Box office <span>heavyweights.</span></h2><p>Worldwide lifetime grosses · US dollars · Top 10 in your library</p></div><div className="box-office-filters"><label>Market<Select aria-label="Box office market" value="worldwide" onChange={()=>{}}><option value="worldwide">Worldwide</option></Select></label><label>Genre<Select aria-label="Box office genre" value={genre} onChange={e=>{setGenre(e.target.value);setItems(null);setError(false);}}><option value="">All Genres</option>{genres.map(g=><option key={g.genre_id} value={g.genre_id}>{g.name}</option>)}</Select></label></div></div>
     {error ? <div className="discovery-message" role="alert">Box-office figures couldn’t be loaded. <button onClick={() => { setError(false); setRetry(value => value + 1); }}>Try again</button></div>
       : !items ? <div className="discovery-loading" role="status">Loading the box office…<div /><div /><div /></div>
       : !movie ? <p className="discovery-message">No box-office figures are available in the library yet.</p>

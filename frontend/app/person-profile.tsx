@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, posterUrl, type Person } from "./api";
 import AnimatedDisclosure from './animated-disclosure';
+import Select from './custom-select';
 
 export function PersonPhoto({ name, photo }: { name: string; photo: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -59,13 +60,13 @@ export default function PersonProfile({ id, openTitle }: { id: number; openTitle
     <section className="filmography"><div className="section-heading"><div><p>ON SCREEN &amp; BEHIND THE SCENES</p><h2>Filmography</h2></div>
       </div>
       <AnimatedDisclosure label="Filmography filters"><div className="filter-grid">
-        <label>Title type<select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Movies &amp; series</option><option value="movie">Movies</option><option value="series">Series</option></select></label>
+        <label>Title type<Select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Movies &amp; series</option><option value="movie">Movies</option><option value="series">Series</option></Select></label>
         <label>Search titles<input type="search" maxLength={120} value={filmFilters.q} onChange={event=>setFilmFilters({...filmFilters,q:event.target.value})} placeholder="Movie or series name…" /></label>
         <label>Release year from<input type="number" min="1870" max="2200" value={filmFilters.year_from} onChange={event=>setFilmFilters({...filmFilters,year_from:event.target.value})} /></label>
         <label>Release year through<input type="number" min="1870" max="2200" value={filmFilters.year_to} onChange={event=>setFilmFilters({...filmFilters,year_to:event.target.value})} /></label>
         <label>Minimum TMDB rating<input type="number" min="0" max="10" step="0.1" value={filmFilters.rating_min} onChange={event=>setFilmFilters({...filmFilters,rating_min:event.target.value})} /></label>
-        <label>Credit role<select value={filmFilters.role} onChange={event=>setFilmFilters({...filmFilters,role:event.target.value})}><option value="">All roles</option>{roles.map(role=><option key={role}>{role}</option>)}</select></label>
-        <label>Sort by<select value={filmFilters.sort} onChange={event=>setFilmFilters({...filmFilters,sort:event.target.value})}><option value="newest">Newest releases</option><option value="oldest">Oldest releases</option><option value="rating_desc">Highest rated</option><option value="title_asc">Title: A–Z</option></select></label>
+        <label>Credit role<Select value={filmFilters.role} onChange={event=>setFilmFilters({...filmFilters,role:event.target.value})}><option value="">All roles</option>{roles.map(role=><option key={role}>{role}</option>)}</Select></label>
+        <label>Sort by<Select value={filmFilters.sort} onChange={event=>setFilmFilters({...filmFilters,sort:event.target.value})}><option value="newest">Newest releases</option><option value="oldest">Oldest releases</option><option value="rating_desc">Highest rated</option><option value="title_asc">Title: A–Z</option></Select></label>
       </div><button type="button" className="text-button" onClick={()=>{setFilter('all');setFilmFilters({q:'',year_from:'',year_to:'',rating_min:'',sort:'newest',role:''});}}>Reset filters</button></AnimatedDisclosure>
       <p className="result-count">{films.length} matching titles in our local library</p>
       <div className="filmography-grid" key={filter}>{films.map((film, index) => <article className="film-card" key={`${film.media_type}-${film.tmdb_id ?? film.title_id}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>

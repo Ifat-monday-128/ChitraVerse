@@ -47,10 +47,11 @@ export default function AuthScreen({ requiredSignIn = false, register, busy, err
             </form>
             <div className="auth-switch"><span>{register ? 'Already part of ChitraVerse?' : 'New to ChitraVerse?'}</span><button type="button" disabled={busy} onClick={() => { setShowPassword(false); toggleMode(); }}>{register ? 'Sign in' : 'Create an account'} <span aria-hidden="true">→</span></button></div>
           </section>
+          {!requiredSignIn && <button type="button" className="auth-back-link" onClick={close}><span aria-hidden="true">←</span> Back to exploring</button>}
           <p className="auth-panel-caption">A WORLD OF CINEMA. ONE PLACE TO CALL YOURS.</p>
         </div>
       </div>
-      {!requiredSignIn && <footer className="auth-footer"><span>CURATED FOR THE LOVE OF CINEMA</span><button type="button" onClick={close}>← Back to exploring</button></footer>}
+      <footer className="auth-footer"><span>CURATED FOR THE LOVE OF CINEMA</span></footer>
     </div>
   </dialog>;
 }

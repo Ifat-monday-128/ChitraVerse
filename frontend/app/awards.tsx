@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, posterUrl } from './api';
 import './awards.css';
+import Select from './custom-select';
 
 type Award = {award_id:number;result?:string|null;recipient?:string|null;name:string;year:number|null;category:string;description:string;source_name:string|null;source_url:string|null};
 type AwardTitle = {title_id:number;title:string;poster:string|null;media_type:'movie'|'series';award_count:number;awards:Award[]};
@@ -37,9 +38,9 @@ export default function Awards({openTitle}:{openTitle:(id:number)=>void}) {
     </header>
     <p className="awards-source-note">Awards and nominations recorded in the library. Imported records include their source; this is not a complete awards history.{data?.summary.retrieved_at&&` Collected ${new Date(data.summary.retrieved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}.`}</p>
     <div className="awards-filters"><label>Search<input type="search" value={q} maxLength={120} placeholder="Title, award or category" onChange={e=>filter(setQ,e.target.value)}/></label>
-      <label>Title type<select value={type} onChange={e=>filter(setType,e.target.value)}><option value="all">Movies & series</option><option value="movie">Movies</option><option value="series">TV series</option></select></label>
-      <label>Award<select value={name} onChange={e=>filter(setName,e.target.value)}><option value="">All awards</option>{data?.names.map(n=><option key={n} value={n}>{n}</option>)}</select></label>
-      <label>Year<select value={year} onChange={e=>filter(setYear,e.target.value)}><option value="">All years</option>{data?.years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>
+      <label>Title type<Select value={type} onChange={e=>filter(setType,e.target.value)}><option value="all">Movies & series</option><option value="movie">Movies</option><option value="series">TV series</option></Select></label>
+      <label>Award<Select value={name} onChange={e=>filter(setName,e.target.value)}><option value="">All awards</option>{data?.names.map(n=><option key={n} value={n}>{n}</option>)}</Select></label>
+      <label>Year<Select value={year} onChange={e=>filter(setYear,e.target.value)}><option value="">All years</option>{data?.years.map(y=><option key={y} value={y}>{y}</option>)}</Select></label>
     </div>
     {(q||type!=='all'||name||year)&&<button className="text-button" onClick={()=>{setQ('');setType('all');setName('');setYear('');setOffset(0);}}>Clear filters</button>}
     {error?<p role="alert" className="message error">{error} <button onClick={()=>setRetry(n=>n+1)}>Retry</button></p>:loading?<p role="status" className="message">Loading awards...</p>:<>

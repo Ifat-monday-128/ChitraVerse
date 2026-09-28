@@ -154,6 +154,11 @@ router.get("/admin/users", async (req, res) => {
   const { rows } = await pool.query(queries.listUsersWithActivity);
   res.json({ users: rows });
 });
+router.get("/admin/online", async (req, res) => {
+  if (req.user.role !== "admin" && req.user.role !== "moderator") return res.status(403).json({ error: "Elevated access required." });
+  const { rows } = await pool.query(queries.listOnlineUsers);
+  res.json({ users: rows });
+});
 router.get('/admin/homepage', async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
   const { rows } = await pool.query(queries.listFeaturedTitles);

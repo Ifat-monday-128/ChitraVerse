@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Dialog from './dialog';
 import { api, ApiError, type User } from './api';
 import './community.css';
+import Select from './custom-select';
 import CommunityStory, { type CommunityPost as Post } from './community-story';
 type Tag = { id:number;name:string };
 const errorText=(e:unknown)=>e instanceof Error?e.message:'Could not reach the community.';
@@ -86,7 +87,7 @@ export default function Community({user,signIn,sessionExpired,openTitle,openPers
     {composer&&user&&<Dialog title="Create a community story" close={closeComposer}><form className="community-form" onSubmit={submit} aria-busy={busy}><p className="eyebrow">YOUR VOICE, YOUR STORY</p><h2>Write a blog</h2><p className="composer-hint">A review, a discovery, a different perspective. Make it yours.</p>
       <fieldset disabled={busy} className="composer-fields"><label>Title<input autoFocus required value={title} onChange={e=>setTitle(e.target.value)} placeholder="Give your story a title" aria-describedby="blog-title-count" maxLength={200}/></label><small className="character-count" id="blog-title-count">{title.length} / 200 characters</small><label>Your story<textarea required value={content} onChange={e=>setContent(e.target.value)} placeholder="What has you thinking about cinema?" aria-describedby="blog-content-count" maxLength={10000}/></label><small className="character-count" id="blog-content-count">{content.length.toLocaleString()} / 10,000 characters</small>
       <button type="button" className="composer-tag-toggle" aria-expanded={showTags} aria-controls="community-tag-options" onClick={()=>setShowTags(value=>!value)}><span>Add to your story</span><span>Film · Cast / crew · Genre <b aria-hidden="true">{showTags?'−':'+'}</b></span></button>
-      {showTags&&<div className="community-tag-fields" id="community-tag-options"><TagSearch kind="media" selected={media} change={setMedia}/><TagSearch kind="people" selected={person} change={setPerson}/><label>Tag genre<select value={genre} onChange={e=>setGenre(e.target.value)}><option value="">Choose a genre (optional)</option>{genres.map(g=><option key={g.genre_id} value={g.genre_id}>{g.name}</option>)}</select></label></div>}
+      {showTags&&<div className="community-tag-fields" id="community-tag-options"><TagSearch kind="media" selected={media} change={setMedia}/><TagSearch kind="people" selected={person} change={setPerson}/><label>Tag genre<Select value={genre} onChange={(e: any)=>setGenre(e.target.value)}><option value="">Choose a genre (optional)</option>{genres.map(g=><option key={g.genre_id} value={g.genre_id}>{g.name}</option>)}</Select></label></div>}
       {!showTags&&(media||person||genre)&&<p className="composer-hint">Your selected tags will be included.</p>}
       </fieldset>{postError&&<p role="alert" className="message error">{postError}</p>}
       <div className="composer-footer"><button type="button" className="text-button" disabled={busy} onClick={closeComposer}>Keep draft & close</button><button className="primary-button" disabled={busy||loadingMore||loading||!title.trim()||!content.trim()}>{busy?'Publishing…':'Publish blog'}</button></div><small className="composer-privacy">Published stories are visible to everyone. Drafts stay here while you remain on this page.</small>

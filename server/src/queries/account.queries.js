@@ -94,3 +94,8 @@ exports.listLegacyWatchlist = `SELECT DISTINCT m.title_id, m.title, m.poster, m.
     CASE WHEN mo.title_id IS NOT NULL THEN 'movie' ELSE 'series' END AS media_type
     FROM watchlist w JOIN watchlist_item wi USING(watchlist_id) JOIN media m USING(title_id)
     LEFT JOIN movie mo USING(title_id) WHERE w.user_id=$1 ORDER BY m.title`;
+
+exports.listOnlineUsers = `SELECT u.user_id, u.name, u.email, u.role, u.created_at, MAX(s.expires_at) as session_expires_at
+    FROM users u JOIN user_session s USING(user_id) 
+    WHERE s.expires_at > now() 
+    GROUP BY u.user_id ORDER BY session_expires_at DESC`;

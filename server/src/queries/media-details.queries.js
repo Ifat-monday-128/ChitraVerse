@@ -48,12 +48,12 @@ exports.titleCredits = `SELECT
          c.cast_crew_id,
          c.name,
          c.photo,
-         r.role_name AS role_type
+         r.role_name AS role_type, mcc.character_name, mcc.display_order
        FROM cast_crew c
        JOIN media_cast_crew mcc ON mcc.cast_crew_id = c.cast_crew_id
        JOIN role r ON r.role_id = mcc.role_id
        WHERE mcc.title_id = $1
-       ORDER BY r.role_name, c.name`;
+       ORDER BY mcc.display_order, r.role_name, c.name`;
 
 exports.titleCompanies = `SELECT p.company_id, p.name, p.country, p.logo
        FROM production_house p

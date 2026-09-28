@@ -71,3 +71,5 @@
 .admin-wordmark:focus-visible{outline:2px solid var(--accent);outline-offset:6px}
 
 .tmdb-import{padding:1.2rem;background:rgba(156,130,255,.07);border:1px solid rgba(156,130,255,.2);border-radius:12px;margin:1rem 0}.tmdb-import h3{margin:0 0 .6rem}.tmdb-import button{margin:.9rem 0}.tmdb-import small{display:block;line-height:1.5}.tmdb-import hr{border:0;border-top:1px solid rgba(255,255,255,.12);margin:1.4rem 0}
+
+.metadata-row{padding:16px;margin:12px 0;border:1px solid #ffffff22;border-radius:10px;display:grid;gap:12px}.structured-metadata{margin:20px 0}.structured-metadata h3{margin-top:24px}

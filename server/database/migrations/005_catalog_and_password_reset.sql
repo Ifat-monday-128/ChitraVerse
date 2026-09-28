@@ -41,10 +41,3 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE IF NOT EXISTS password_reset (
-  user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
-  code_hash TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  attempts INT NOT NULL DEFAULT 0,
-  sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);

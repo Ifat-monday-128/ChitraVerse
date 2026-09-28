@@ -56,7 +56,6 @@ router.put('/password', async (req, res) => {
     await client.query(queries.changePassword, [`scrypt:${nextSalt}:${nextKey.toString('hex')}`, req.user.user_id]);
     const token = (req.headers.cookie || '').split(';').map(p => p.trim()).find(p => p.startsWith('chitraverse_session='))?.slice('chitraverse_session='.length) || '';
     await client.query(queries.revokeOtherSessions, [req.user.user_id, createHash('sha256').update(token).digest('hex')]);
-    await client.query(queries.deletePasswordReset, [req.user.user_id]);
     await client.query(queries.commit);
     res.json({ updated: true });
   } catch (error) { await client.query(queries.rollback); throw error; }

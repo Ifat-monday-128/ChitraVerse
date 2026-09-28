@@ -24,7 +24,7 @@ Keep values in the separate parameters array. Never interpolate user input into 
 
 | Location | Query files |
 | --- | --- |
-| `../routes/` | `admin-dashboard.queries.js`, `admin-management.queries.js`, `awards.queries.js`, `password-reset.queries.js` |
+| `../routes/` | `admin-dashboard.queries.js`, `admin-management.queries.js`, `awards.queries.js` |
 | `../services/` | `directory.queries.js`, `person.queries.js`, `external-title.queries.js`, `home-discovery.queries.js`, `tmdb-import.queries.js` |
 | `../sync/` | `syncAll.queries.js`, `enrichAll.queries.js`, `searchTrailers.queries.js`, `collectAwards.queries.js`, `importAwards.queries.js` |
 | `../` | `createAccount.queries.js`, beside the local account creation command |

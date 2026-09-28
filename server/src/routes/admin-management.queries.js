@@ -12,7 +12,7 @@ exports.callSaveCatalogTitle = 'CALL save_catalog_title($1::int,$2::text,$3::tex
 
 exports.deleteMedia = 'DELETE FROM media WHERE title_id=$1 AND title=$2 RETURNING title_id';
 
-exports.selectUserIdUsers = `SELECT user_id,name,email,role,created_at FROM users WHERE strpos(lower(name||' '||email),lower($1))>0 ORDER BY user_id DESC LIMIT 21 OFFSET $2`;
+exports.selectUserIdUsers = `SELECT user_id,name,email,role,created_at,suspension_reason,suspended_until FROM users WHERE strpos(lower(name||' '||email),lower($1))>0 ORDER BY user_id DESC LIMIT 21 OFFSET $2`;
 
 exports.begin = transactions.begin;
 

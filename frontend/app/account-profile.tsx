@@ -34,6 +34,7 @@ async function preparePhoto(file: File): Promise<string> {
 }
 
 export default function AccountProfile(props: AccountProfileProps) {
+  const [sidebarOpen,setSidebarOpen]=useState(false);
   const [tab, setTab] = useState<Tab>('Overview');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState(props.user.name);
@@ -85,7 +86,8 @@ export default function AccountProfile(props: AccountProfileProps) {
   function navigate(next: Tab) { if (next === 'Activity' && tab !== next) { setActivityLoading(true); setActivityError(''); } setTab(next); setSuccess(''); if (profile) setError(''); }
   function portrait(photo: string | null | undefined, large = false) { return <span className={`account-portrait ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${displayedUser.name}'s profile`} /> : <span>{displayedUser.name.slice(0, 2).toUpperCase()}</span>}</span>; }
   return <section className="account-hub" aria-label="Account dashboard">
-    <aside className="account-sidebar">
+    <button className="sidebar-toggle secondary-button" aria-expanded={sidebarOpen} onClick={()=>setSidebarOpen(!sidebarOpen)}>Menu: Account navigation</button>
+    <aside className={`account-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <div className="account-brand">CHITRA<span>VERSE</span><small>YOUR PERSONAL SPACE</small></div>
       <div className="account-sidebar-person">{portrait(displayedUser.avatar)}<strong>{displayedUser.name}</strong><span className="account-role">{admin ? 'Administrator' : props.user.role === 'moderator' ? 'Moderator' : 'Cinema lover'}</span></div>
       <nav aria-label="Account sections">{(['Overview', 'My account', 'Activity', 'Security'] as Tab[]).map((item, index) => <button type="button" key={item} className={tab === item ? 'active' : ''} aria-current={tab === item ? 'page' : undefined} onClick={() => navigate(item)}><span aria-hidden="true">{['◫', '◎', '◷', '◇'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}
@@ -99,7 +101,6 @@ export default function AccountProfile(props: AccountProfileProps) {
       {success && <p className="account-notice success" role="status">{success}</p>}
       {!profile ? (!error ? <p className="account-loading" role="status">Loading your personal space…</p> : null) : <>
       {tab === 'Overview' && <>
-        <div className="account-welcome"><div className="account-hero-art" aria-hidden="true">{profile.favorites.slice(0,3).map(item => posterUrl(item.poster) ? <img key={item.title_id} src={posterUrl(item.poster)} alt="" /> : null)}</div><div className="account-hero-copy"><span className="eyebrow">YOUR WORLD OF CINEMA</span><h2>Good stories stay with you.</h2><p>Keep the films you love close, and the ones you have yet to discover closer.</p><div className="account-hero-actions"><button className="primary-button" onClick={admin ? props.homepage : props.watchlists}>{admin ? 'Manage homepage' : 'My watchlists'} <span aria-hidden="true">&#8599;</span></button><button className="secondary-button" onClick={() => navigate('My account')}>Manage profile</button></div></div></div>
         <div className="account-stats">{Object.entries(profile?.counts || {}).map(([key, value]) => <button key={key} onClick={() => key === 'favorites' ? props.favorites() : key === 'playlists' ? props.watchlists() : navigate('Activity')} disabled={admin && (key === 'favorites' || key === 'playlists')}><strong>{value.toLocaleString()}</strong><span>{key}</span></button>)}</div>
         <div className="account-quick-actions"><button onClick={() => navigate('My account')}><span aria-hidden="true">◎</span><div><strong>My account</strong><small>Update your name and profile photo</small></div><b aria-hidden="true">↗</b></button><button onClick={() => navigate('Security')}><span aria-hidden="true">◇</span><div><strong>Password & security</strong><small>A little peace of mind for your account</small></div><b aria-hidden="true">↗</b></button></div>
         {admin ? <div className="account-quick-actions"><button onClick={props.homepage}>Manage homepage <b>↗</b></button><button onClick={props.activity}>Users & activity <b>↗</b></button></div> : <>

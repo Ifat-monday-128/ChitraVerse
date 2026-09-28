@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import Dialog from "./dialog";
+import { LibraryProvider } from "./library-state";
 import Card, { Poster } from "./media-card";
 import { LibraryPage, TitleLibraryActions } from "./library";
 import { ChitraVerseRating } from "./role-features";
@@ -22,6 +23,8 @@ import BrandWordmark from './brand-wordmark';
 import MenuDrawer from './menu-drawer';
 import Community from './community';
 import Dashboard from './dashboard';
+import Moderation from './moderation';
+import './workspace-layout.css';
 import AccountProfile from './account-profile';
 import MediaComments from './media-comments';
 import AnimatedDisclosure from './animated-disclosure';
@@ -62,11 +65,15 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [moderation, setModeration] = useState(false);
+  const [unreadReports, setUnreadReports] = useState(0);
+
   const [menu, setMenu] = useState(false);
   const [account, setAccount] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [register, setRegister] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  useEffect(() => { if(user?.role !== 'admin') return; const refresh = () => api<{unread:number}>('/api/account/moderation/notifications').then(d=>setUnreadReports(d.unread)).catch(()=>{}); refresh(); const timer=setInterval(refresh,30000); window.addEventListener('chitraverse:reports-changed',refresh); return()=>{clearInterval(timer);window.removeEventListener('chitraverse:reports-changed',refresh);}; }, [user]);
   const [accountError, setAccountError] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -248,7 +255,7 @@ export default function Home() {
     try {
       // Wait for the server to delete the session before clearing the UI.
       await api("/api/account/logout", { method: "POST" });
-      setUser(null);
+      setUser(null); setModeration(false);
       if (typeof BroadcastChannel !== "undefined") { const channel = new BroadcastChannel("chitraverse-account"); channel.postMessage("changed"); channel.close(); }
       setAdminOpen(false);
       setAccount(false);
@@ -261,6 +268,7 @@ export default function Home() {
   }
   const isHome = route.view === "home" && detailId === null && personId === null && companyId === null && externalTitle === null;
   const isDirectory = detailId === null && personId === null && companyId === null && externalTitle === null;
+  const isDashboard = isDirectory && route.view === "dashboard";
   const isAdminDashboard = isDirectory && route.view === "dashboard" && user?.role === "admin";
   const isSearchPage = isDirectory && route.view === "search";
   const heading = route.view === "search" ? "Search the library" : route.view === "watchlist" ? "My watchlist" : route.collection === "hollywood" ? "Hollywood movies" : route.type === "series" ? "TV shows" : "Movies";
@@ -268,8 +276,8 @@ export default function Home() {
   const heroTrailer = trailerEmbedUrl(hero?.trailer_link);
 
 
-  return <main className={`home-shell ${isHome ? "" : "full-page-shell"} ${isAdminDashboard ? "admin-shell" : ""}`}>
-    {!isAdminDashboard && <section className={`hero ${isHome ? "" : "compact"} ${isSearchPage ? "search-page-hero" : ""}`} onFocusCapture={event => setHeroFocused(Boolean(event.target.closest('.hero-copy, .hero-carousel-controls')))} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setHeroFocused(false); }}>
+  return <LibraryProvider user={user}><main className={`home-shell ${isHome ? "" : "full-page-shell"} ${isAdminDashboard ? "admin-shell" : ""} ${isDashboard ? "dashboard-shell" : ""}`}>
+    {!isDashboard && <section className={`hero ${isHome ? "" : "compact"} ${isSearchPage ? "search-page-hero" : ""}`} onFocusCapture={event => setHeroFocused(Boolean(event.target.closest('.hero-copy, .hero-carousel-controls')))} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setHeroFocused(false); }}>
       {isHome && <HeroBackdrop url={heroImage} />}
       <header className={`topbar ${isDirectory && route.view === "search" ? "search-expanded" : ""}`}><div className="topbar-side">
         <button className="icon-button menu" aria-label="Open menu" aria-expanded={menu} aria-controls="navigation-drawer" aria-haspopup="dialog" onClick={() => setMenu(true)}><i /><i /><i /></button>
@@ -331,13 +339,17 @@ export default function Home() {
     {externalTitle !== null && <section className="content-page title-page" key={externalTitle}><button className="back-button" onClick={back}>← Back</button><ExternalTitle reference={externalTitle} openTitle={openTitle} /></section>}
     {isDirectory && route.view === "community" && <Community key={user?.user_id ?? "guest"} user={user} signIn={()=>setAccount(true)} sessionExpired={expireSession} openTitle={openTitle} openPerson={openPerson} openGenre={id=>go({view:"search",genre:String(id)})} />}
     {isDirectory && route.view === "dashboard" && <Dashboard openPerson={openPerson} openGenre={id=>go({view:'search',genre:String(id)})} user={user} updated={setUser} openTitle={openTitle} openList={id=>go({view:'watchlist',listId:id})} busy={accountBusy} error={accountError} signIn={()=>setAccount(true)} logout={logout} watchlists={()=>go({view:"watchlist"})} favorites={()=>go({view:"favorites"})} community={()=>go({view:"community"})} homepage={()=>setHomepageEditor(true)} activity={()=>setAdminOpen(true)} />}
-    {menu && <MenuDrawer close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} user={user} profile={() => user ? go({view:'dashboard'}) : setAccount(true)} items={[
+    {isDashboard && <button className="workspace-menu secondary-button" onClick={()=>setMenu(true)}>Menu: Site navigation</button>}
+    {user?.suspended && <div className="message error" role="alert">Account suspended: {user.suspension_reason}. <button disabled={accountBusy} onClick={logout}>Sign out</button></div>}
+    {moderation && user && <Dialog title="Community moderation" close={()=>{setModeration(false);window.dispatchEvent(new Event("chitraverse:reports-changed"));}}><Moderation user={user}/></Dialog>}
+    {menu && <MenuDrawer logout={logout} busy={accountBusy} error={accountError} close={() => setMenu(false)} home={() => go()} admin={user?.role === 'admin'} user={user} profile={() => user ? go({view:'dashboard'}) : setAccount(true)} items={[
       { label: 'Home · Hollywood', icon: 'home', active: isHome, action: () => go() },
       { label: 'All movies', icon: 'movies', active: isDirectory && route.view === 'browse' && route.type === 'movie', action: () => go({ view: 'browse', type: 'movie' }) },
       { label: 'Awards', icon: 'movies', active: isDirectory && route.view === 'awards', action: () => go({ view: 'awards' }) },
       { label: 'TV shows', icon: 'tv', active: isDirectory && route.view === 'browse' && route.type === 'series', action: () => go({ view: 'browse', type: 'series' }) },
       { label: 'Search the library', icon: 'search', active: isDirectory && route.view === 'search', action: () => go({ view: 'search' }) },
       { label: 'Cast & crew', icon: 'people', active: isDirectory && route.view === 'cast', action: () => go({ view: 'cast' }) },
+      ...(['admin','moderator'].includes(user?.role || '') ? [{ label: `Reports${unreadReports ? ` (${unreadReports} unread)` : ''}`, icon: 'activity', action: () => setModeration(true) }] : []),
       { label: 'CVcommunity', icon: 'people', active: isDirectory && route.view === 'community', action: () => go({ view: 'community' }) },
     ]} library={user?.role === 'admin' ? [
       { label: 'Manage homepage', icon: 'edit', action: () => setHomepageEditor(true) },
@@ -358,7 +370,7 @@ export default function Home() {
         <TitleAwards key={detail.title_id} titleId={detail.title_id} />
         <MediaComments key={`comments-${detail.title_id}-${user?.user_id ?? "guest"}`} id={detail.title_id} user={user} signIn={()=>setAccount(true)} />
         {!!detail.cast_crew?.length && <><h3>Cast &amp; crew</h3><ul className="cast-grid">{detail.cast_crew.map((person, index) => <li key={`${person.cast_crew_id}-${person.role_type}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
-          <button className="cast-card" onClick={() => openPerson(person.cast_crew_id)}><div className="cast-photo"><PersonPhoto name={person.name} photo={person.photo} /></div><strong>{person.name}</strong><small>{person.role_type}</small><span>View profile →</span></button></li>)}</ul></>}
+          <button className="cast-card" onClick={() => openPerson(person.cast_crew_id)}><div className="cast-photo"><PersonPhoto name={person.name} photo={person.photo} /></div><strong>{person.name}</strong><small>{person.character_name || person.role_type}</small><span>View profile →</span></button></li>)}</ul></>}
         {!!detail.production_companies?.length && <ProductionCredits companies={detail.production_companies} openCompany={openCompany} />}
         {!!detail.seasons?.length && <><h3>Episodes</h3><label className="filter-label">Season<select value={season} onChange={(event) => setSeason(event.target.value)}>{detail.seasons.map((item) => <option key={item.season_id} value={item.season_number}>Season {item.season_number} · {item.total_episode} episodes</option>)}</select></label>
           {episodeError && <p role="alert">{episodeError}</p>}{episodesLoading ? <p role="status">Loading episodes…</p> : episodes.length ? <ol className="episodes">{episodes.map((episode) => <li key={episode.ep_id}>{episode.episode_number}. {episode.title}</li>)}</ol> : !episodeError && <p>No episodes are available for this season.</p>}</>}
@@ -373,5 +385,5 @@ export default function Home() {
         openTitle={id=>{setAccount(false);openTitle(id);}} openList={id=>{setAccount(false);go({view:'watchlist',listId:id});}}
         community={()=>{setAccount(false);go({view:'community'});}} homepage={()=>{setAccount(false);setHomepageEditor(true);}} activity={()=>{setAccount(false);setAdminOpen(true);}} />
     </Dialog>}
-  </main>;
+  </main></LibraryProvider>;
 }

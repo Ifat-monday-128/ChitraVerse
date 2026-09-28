@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react';
 import { api, posterUrl } from './api';
 import './awards.css';
 
-type Award = {award_id:number;name:string;year:number|null;category:string;description:string;source_name:string|null;source_url:string|null};
+type Award = {award_id:number;result?:string|null;recipient?:string|null;name:string;year:number|null;category:string;description:string;source_name:string|null;source_url:string|null};
 type AwardTitle = {title_id:number;title:string;poster:string|null;media_type:'movie'|'series';award_count:number;awards:Award[]};
 type Result = {items:AwardTitle[];total:number;hasMore:boolean;summary:{movies:number;series:number;records:number;retrieved_at:string|null};names:string[];years:number[]};
 const errorMessage=(e:unknown)=>e instanceof Error?e.message:'Could not load awards. Please try again.';
 function AwardRow({award}:{award:Award}) {
   const source=award.source_url?.startsWith('https://')?award.source_url:null;
-  return <li className="award-record"><span className="award-year">{award.year??'Year unavailable'}</span><div><strong>{award.name}</strong><p>{award.category}</p>
+  return <li className="award-record"><span className="award-year">{award.year??'Year unavailable'}</span><div><strong>{award.name}</strong><p>{[award.category,award.result,award.recipient].filter(Boolean).join(" · ")}</p>
     {source?<a href={source} target="_blank" rel="noopener noreferrer">Source: {award.source_name||'award record'} <span aria-hidden="true">↗</span></a>:<small>{award.description}</small>}</div></li>;
 }
 function AwardList({awards}:{awards:Award[]}) {
@@ -35,7 +35,7 @@ export default function Awards({openTitle}:{openTitle:(id:number)=>void}) {
   return <section className="awards-page" aria-labelledby="awards-heading">
     <header className="awards-intro"><div><p className="eyebrow">RECOGNITION IN CINEMA & TELEVISION</p><h1 id="awards-heading">Awards</h1><p>Explore award-winning movies and series from your ChitraVerse library.</p></div>
     </header>
-    <p className="awards-source-note">Selected, dated awards and honors associated with these titles, recorded in Wikidata. Nominations are excluded; this is not a complete awards history. Each record includes its source.{data?.summary.retrieved_at&&` Collected ${new Date(data.summary.retrieved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}.`}</p>
+    <p className="awards-source-note">Awards and nominations recorded in the library. Imported records include their source; this is not a complete awards history.{data?.summary.retrieved_at&&` Collected ${new Date(data.summary.retrieved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}.`}</p>
     <div className="awards-filters"><label>Search<input type="search" value={q} maxLength={120} placeholder="Title, award or category" onChange={e=>filter(setQ,e.target.value)}/></label>
       <label>Title type<select value={type} onChange={e=>filter(setType,e.target.value)}><option value="all">Movies & series</option><option value="movie">Movies</option><option value="series">TV series</option></select></label>
       <label>Award<select value={name} onChange={e=>filter(setName,e.target.value)}><option value="">All awards</option>{data?.names.map(n=><option key={n} value={n}>{n}</option>)}</select></label>
@@ -61,5 +61,5 @@ export function TitleAwards({titleId}:{titleId:number}) {
     .then(data=>{if(!controller.signal.aborted){setAwards(data.awards);setError('');}}).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e));});return()=>controller.abort();},[titleId,retry]);
   if(error)return <p className="message error" role="alert">Awards unavailable. <button onClick={()=>setRetry(n=>n+1)}>Retry</button></p>;
   if(!awards.length)return null;
-  return <section className="title-awards" aria-label="Title awards"><h3>Awards</h3><p className="awards-source-note">Selected documented wins. Open a source to see the original record.</p><AwardList awards={awards}/></section>;
+  return <section className="title-awards" aria-label="Title awards"><h3>Awards</h3><p className="awards-source-note">Awards and nominations. Open a source, when provided, to see the original record.</p><AwardList awards={awards}/></section>;
 }

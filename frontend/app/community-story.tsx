@@ -1,9 +1,11 @@
 "use client";
 import { useState } from 'react';
+import type { User } from './api';
+import StoryActions from './story-actions';
 
-export type CommunityPost = { post_id:number;title:string;content:string;name:string;created_at:string;media_id:number|null;cast_crew_id:number|null;genre_id:number|null;media_title?:string;cast_name?:string;genre_name?:string };
+export type CommunityPost = { post_id:number;user_id?:number;comment_count?:number;title:string;content:string;name:string;created_at:string;media_id:number|null;cast_crew_id:number|null;genre_id:number|null;media_title?:string;cast_name?:string;genre_name?:string };
 
-export default function CommunityStory({ post, openTitle, openPerson, openGenre }: { post:CommunityPost;openTitle:(id:number)=>void;openPerson:(id:number)=>void;openGenre:(id:number)=>void }) {
+export default function CommunityStory({ post, openTitle, openPerson, openGenre, user, signIn, changed }: { post:CommunityPost;user?:User|null;signIn?:()=>void;changed?:()=>void;openTitle:(id:number)=>void;openPerson:(id:number)=>void;openGenre:(id:number)=>void }) {
   const [expanded, setExpanded] = useState(false);
   const long = post.content.length > 600;
   const minutes = Math.max(1, Math.ceil(post.content.trim().split(/\s+/).length / 200));
@@ -12,5 +14,6 @@ export default function CommunityStory({ post, openTitle, openPerson, openGenre 
     <h3>{post.title}</h3><p id={`story-${post.post_id}`}>{long && !expanded ? `${post.content.slice(0,600).trimEnd()}…` : post.content}</p>
     {long && <button className="story-read-more" aria-expanded={expanded} aria-controls={`story-${post.post_id}`} onClick={()=>setExpanded(!expanded)}>{expanded ? 'Show less' : 'Read full story'}</button>}
     <div className="community-tags">{post.media_id && <button className="community-tag" onClick={()=>openTitle(post.media_id!)}>{post.media_title}</button>}{post.cast_crew_id && <button className="community-tag" onClick={()=>openPerson(post.cast_crew_id!)}>{post.cast_name}</button>}{post.genre_id && <button className="community-tag" onClick={()=>openGenre(post.genre_id!)}>{post.genre_name}</button>}</div>
+    {signIn && changed && <StoryActions post={post} user={user || null} signIn={signIn} changed={changed} />}
   </article>;
 }

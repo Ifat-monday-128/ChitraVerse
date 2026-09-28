@@ -31,7 +31,6 @@ exports.changePassword = 'UPDATE users SET password_hash=$1 WHERE user_id=$2';
 
 exports.revokeOtherSessions = 'DELETE FROM user_session WHERE user_id=$1 AND token_hash<>$2';
 
-exports.deletePasswordReset = 'DELETE FROM password_reset WHERE user_id=$1';
 
 exports.commit = transactions.commit;
 

@@ -29,7 +29,7 @@ exports.topBoxOffice = `SELECT m.title_id, m.title, m.poster, m.description,
     m.tmdb_rating, m.budget, mo.runtime, mo.box_office_gross,
     to_char(mo.release_date, 'YYYY-MM-DD') AS release_date, 'movie' AS media_type
     FROM movie mo JOIN media m USING(title_id)
-    WHERE mo.box_office_gross > 0
+    WHERE mo.box_office_gross > 0 AND ($1::int IS NULL OR EXISTS (SELECT 1 FROM media_genre mg WHERE mg.title_id=m.title_id AND mg.genre_id=$1))
     ORDER BY mo.box_office_gross DESC, m.title_id LIMIT 10`;
 
 exports.birthdays = `SELECT c.cast_crew_id, c.name, c.photo,

@@ -25,6 +25,8 @@ function sessionToken(req) {
   return token && token.length <= 4096 ? token : null;
 }
 
+function suspended(user) { return user?.suspension_reason && (!user.suspended_until || new Date(user.suspended_until) > new Date()); }
+function suspensionError(user, res) { return res.status(403).json({ error: `Account suspended: ${user.suspension_reason}${user.suspended_until ? ` (until ${new Date(user.suspended_until).toISOString()})` : ''}. You can sign out.`, suspended: true }); }
 function publicUser(user) {
   return { user_id: user.user_id, name: user.name, email: user.email, role: user.role, avatar: user.avatar || null };
 }
@@ -46,8 +48,7 @@ async function createSession(req, res, user, registerUser) {
     await client.query(queries.begin);
     if (registerUser) user = await registerUser(client);
     else {
-      // Serialize login with password resets; an old password cannot create a
-      // new session after a concurrent reset has already revoked existing ones.
+      // Serialize login with authenticated password changes.
       const locked = await client.query(queries.lockPassword, [user.user_id]);
       if (locked.rows[0]?.password_hash !== user.password_hash) {
         await client.query(queries.rollback);
@@ -87,10 +88,9 @@ router.get("/me", async (req, res) => {
   const user = await currentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in to view your account." });
   const { rows } = await pool.query(queries.getAvatar, [user.user_id]);
-  return res.json({ user: { ...user, avatar: rows[0]?.avatar || null } });
+  return res.json({ user: { ...user, suspended: Boolean(suspended(user)), avatar: rows[0]?.avatar || null } });
 });
-router.use(['/forgot-password','/reset-password'], throttle);
-router.use(require('./password-reset.routes'));
+
 router.post("/register", throttle, async (req, res) => {
   const { name, email, password } = req.body || {};
   if (typeof name !== "string" || !name.trim() || name.length > 255 || typeof email !== "string"
@@ -126,6 +126,7 @@ router.post("/login", throttle, async (req, res) => {
   if (!user || format !== "scrypt" || expected.length !== key.length || !timingSafeEqual(key, expected)) {
     return res.status(401).json({ error: "Email or password is incorrect." });
   }
+  if (suspended(user)) return suspensionError(user, res);
   // The role comes from this database row; any role in req.body is ignored.
   return createSession(req, res, user);
 });
@@ -139,8 +140,10 @@ router.post("/logout", async (req, res) => {
 router.use(async (req, res, next) => {
   req.user = await currentUser(req);
   if (!req.user) return res.status(401).json({ error: "Sign in to continue." });
+  if (suspended(req.user)) return suspensionError(req.user, res);
   next();
 });
+router.use(require('./community.routes').account);
 router.put('/password', throttle);
 router.use(require('./profile.routes'));
 router.use(require('./admin-dashboard.routes'));
@@ -251,6 +254,7 @@ module.exports = router;
 module.exports.requireUser = async (req, res, next) => {
   req.user = await currentUser(req);
   if (!req.user) return res.status(401).json({ error: 'Sign in to continue.' });
+  if (suspended(req.user)) return suspensionError(req.user, res);
   res.set('Cache-Control','no-store');
   next();
 };

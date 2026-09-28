@@ -1,7 +1,7 @@
 const transactions = require('./transactions.queries');
 // SQL for routes/account.routes.js. Values are bound by the caller.
 
-exports.findSessionUser = `SELECT u.user_id, u.name, u.email, u.role FROM users u
+exports.findSessionUser = `SELECT u.user_id, u.name, u.email, u.role, u.suspension_reason, u.suspended_until FROM users u
     JOIN user_session s USING(user_id)
     WHERE s.token_hash=$1 AND s.expires_at > now() AND u.user_id=$2`;
 
@@ -22,7 +22,7 @@ exports.getAvatar = 'SELECT avatar FROM users WHERE user_id=$1';
 
 exports.registerUser = `INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'user') RETURNING user_id,name,email,role`;
 
-exports.findByEmail = "SELECT user_id,name,email,password_hash,role,avatar FROM users WHERE email=$1";
+exports.findByEmail = "SELECT user_id,name,email,password_hash,role,avatar,suspension_reason,suspended_until FROM users WHERE email=$1";
 
 exports.revokeSession = "DELETE FROM user_session WHERE token_hash=$1";
 
@@ -72,7 +72,7 @@ exports.titleExists = 'SELECT 1 FROM media WHERE title_id=$1';
 exports.insertMediaComment = `INSERT INTO media_comment(user_id,title_id,content) VALUES($1,$2,$3)
       RETURNING comment_id,content,created_at`;
 
-exports.listCommunityPosts = `SELECT p.*,u.name, m.title AS media_title, c.name AS cast_name, g.name AS genre_name FROM community_post p JOIN users u USING(user_id) LEFT JOIN media m ON m.title_id=p.media_id LEFT JOIN cast_crew c USING(cast_crew_id) LEFT JOIN genre g USING(genre_id) ORDER BY p.created_at DESC,p.post_id DESC LIMIT 21 OFFSET $1`;
+exports.listCommunityPosts = `SELECT p.*,(SELECT count(*)::int FROM community_comment cc WHERE cc.post_id=p.post_id AND NOT cc.hidden) AS comment_count,u.name, m.title AS media_title, c.name AS cast_name, g.name AS genre_name FROM community_post p JOIN users u USING(user_id) LEFT JOIN media m ON m.title_id=p.media_id LEFT JOIN cast_crew c USING(cast_crew_id) LEFT JOIN genre g USING(genre_id) WHERE NOT p.hidden AND p.deleted_at IS NULL ORDER BY p.created_at DESC,p.post_id DESC LIMIT 21 OFFSET $1`;
 
 exports.insertCommunityPost = `INSERT INTO community_post(user_id,title,content,media_id,cast_crew_id,genre_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`;
 

@@ -24,7 +24,7 @@
 
 ### Technology Stack
 * **Frontend**: Next.js 15 (React 19, TypeScript), Tailwind CSS, Custom SVG/CSS Motion Animations.
-* **Backend**: Node.js 22, Express.js 5, Native PostgreSQL driver (`pg` connection pool), Nodemailer, JWT.
+* **Backend**: Node.js 22, Express.js 5, Native PostgreSQL driver (`pg` connection pool), JWT.
 * **Database**: PostgreSQL with PL/pgSQL Triggers, Functions, Procedures, Views, Composite Indexes, and Foreign Key Constraints.
 
 ---
@@ -115,20 +115,11 @@ Every multi-step DML operation (Insert/Update/Delete) must enforce explicit data
 We use NodeJS PostgreSQL client transactions with explicit SQL execution: `BEGIN`, `COMMIT`, and `ROLLBACK`.
 
 ```javascript
-// Explicit Transaction Example: Catalog Modification & Password Reset Flow
-// File: server/src/queries/transactions.queries.js & server/src/routes/password-reset.routes.js
+// Explicit Transaction Example: Catalog Modification Flow
+// File: server/src/queries/transactions.queries.js
 const client = await pool.connect();
 try {
   await client.query('BEGIN'); // Start explicit transaction
-
-  // Step 1: Update or Delete user data / reset state
-  await client.query('DELETE FROM password_reset WHERE user_id = $1', [userId]);
-
-  // Step 2: Insert new reset token code hash
-  await client.query(
-    'INSERT INTO password_reset (user_id, code_hash, expires_at, sent_at) VALUES ($1, $2, $3, NOW())',
-    [userId, codeHash, expiresAt]
-  );
 
   await client.query('COMMIT'); // Commit all changes if successful
 } catch (error) {

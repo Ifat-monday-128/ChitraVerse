@@ -11,8 +11,8 @@ exports.interests = async () => {
   return { items: rows };
 };
 
-exports.boxOffice = async () => {
-  const { rows } = await pool.query(queries.topBoxOffice);
+exports.boxOffice = async (genre = null) => {
+  const { rows } = await pool.query(queries.topBoxOffice, [genre]);
   return { items: rows, territory: 'worldwide', period: 'lifetime', currency: 'USD' };
 };
 

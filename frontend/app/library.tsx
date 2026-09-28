@@ -5,6 +5,7 @@ import { api, ApiError, type Media, type User } from './api';
 import Dialog from './dialog';
 import Card from './media-card';
 import './library.css';
+import { useLibrary, libraryChanged } from './library-state';
 
 type Watchlist = { watchlist_id: number; name: string; title_count: number; contains_title: boolean };
 const message = (error: unknown) => error instanceof ApiError ? error.message : 'Could not connect. Please try again.';
@@ -32,9 +33,11 @@ export function WatchlistChooser({ item, close }: { item: Media; close: () => vo
     return () => controller.abort();
   }, [item.title_id, retry]);
   async function toggle(list: Watchlist) {
+    if(busy)return;
     setBusy(true); setError('');
     try {
       const result = await api<{ saved: boolean }>(`/api/account/watchlists/${list.watchlist_id}/items/${item.title_id}`, { method: list.contains_title ? 'DELETE' : 'PUT' });
+      libraryChanged();
       setLists(current => current?.map(row => row.watchlist_id === list.watchlist_id ? { ...row, contains_title: result.saved, title_count: row.title_count + (result.saved ? 1 : -1) } : row) ?? null);
     } catch (error) { setError(message(error)); }
     finally { setBusy(false); }
@@ -47,8 +50,8 @@ export function WatchlistChooser({ item, close }: { item: Media; close: () => vo
     } catch (error) { setError(message(error)); }
     finally { setBusy(false); }
   }
-  return <Dialog title="Add to watchlist" close={close}>
-    <p className="eyebrow">YOUR LIBRARY</p><h2>Add to watchlist</h2><p>{item.title}</p>
+  return <Dialog busy={busy} title="Manage watchlists" close={()=>{if(!busy)close();}}>
+    <p className="eyebrow">YOUR LIBRARY</p><h2>Manage watchlists</h2><p>{item.title}</p>
     <p className="unavailable">Choose each list where you want to save this title. Changes save immediately.</p>
     {error && <p className="message error" role="alert">{error} <button disabled={busy} onClick={() => { setError(''); setLists(null); setRetry(value => value + 1); }}>Try again</button></p>}
     {!lists && !error && <p role="status">Loading watchlists…</p>}
@@ -64,6 +67,7 @@ export function WatchlistChooser({ item, close }: { item: Media; close: () => vo
 }
 
 export function TitleLibraryActions({ item, user, signIn }: { item: Media; user: User | null; signIn: () => void }) {
+  const {saved,loaded}=useLibrary();
   const [chooser, setChooser] = useState(false);
   const [favorite, setFavorite] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,7 +92,7 @@ export function TitleLibraryActions({ item, user, signIn }: { item: Media; user:
   }
   if (user?.role === 'admin') return null;
   return <><div className="detail-actions title-library-actions">
-    <button className="secondary-button" onClick={() => user ? setChooser(true) : signIn()}>Add to watchlist</button>
+    <button className="secondary-button" aria-pressed={saved.has(item.title_id)} onClick={() => user ? setChooser(true) : signIn()}>{saved.has(item.title_id) ? "✓ Added to Watchlist" : user && !loaded ? "Manage Watchlists" : "Add to Watchlist"}</button>
     <button className="secondary-button favorite-button" aria-pressed={favorite === true} disabled={busy || (!!user && favorite === null)} onClick={toggleFavorite}>
       {busy ? 'Saving…' : user && favorite === null ? 'Loading favorites…' : favorite ? '♥ Favorited' : '♡ Add to favorites'}
     </button>
@@ -111,6 +115,7 @@ export function LibraryPage({ kind, listId, user, signIn, openList, openTitle }:
   const [retry, setRetry] = useState(0);
   const [editing, setEditing] = useState<'create' | 'rename' | 'delete' | null>(null);
   const [editError, setEditError] = useState('');
+  useEffect(()=>{const refresh=()=>setRetry(n=>n+1);window.addEventListener('chitraverse:library-changed',refresh);const c=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('chitraverse-library');if(c)c.onmessage=refresh;return()=>{window.removeEventListener('chitraverse:library-changed',refresh);c?.close();};},[]);
   const favorites = kind === 'favorites';
   const showingTitles = favorites || listId !== null;
   useEffect(() => {
@@ -129,13 +134,13 @@ export function LibraryPage({ kind, listId, user, signIn, openList, openTitle }:
       const result = await api<{ watchlist: Watchlist }>(editing === 'rename' ? `/api/account/watchlists/${listId}` : '/api/account/watchlists', { method: editing === 'rename' ? 'PATCH' : 'POST', body: JSON.stringify({ name }) });
       if (editing === 'rename') setList(result.watchlist);
       else setLists(current => [...current, result.watchlist]);
-      setEditing(null);
+      setEditing(null); libraryChanged();
     } catch (error) { setEditError(message(error)); }
     finally { setBusy(false); }
   }
   async function deleteList() {
     setBusy(true); setEditError('');
-    try { await api(`/api/account/watchlists/${listId}`, { method: 'DELETE' }); openList(null); }
+    try { await api(`/api/account/watchlists/${listId}`, { method: 'DELETE' }); libraryChanged(); openList(null); }
     catch (error) { setEditError(message(error)); }
     finally { setBusy(false); }
   }
@@ -143,6 +148,7 @@ export function LibraryPage({ kind, listId, user, signIn, openList, openTitle }:
     setBusy(true); setError('');
     try {
       await api(favorites ? `/api/account/favorites/${item.title_id}` : `/api/account/watchlists/${listId}/items/${item.title_id}`, { method: 'DELETE' });
+      libraryChanged();
       setItems(current => current.filter(row => row.title_id !== item.title_id));
     } catch (error) { setError(message(error)); }
     finally { setBusy(false); }

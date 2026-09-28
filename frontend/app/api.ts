@@ -4,11 +4,11 @@ export type Media = {
   tmdb_rating: string | null; media_type: "movie" | "series"; runtime?: number | null;
   release_date?: string | null; first_air_date?: string | null; language?: string; trailer_link?: string | null;
   genres?: { name: string }[];
-  cast_crew?: { cast_crew_id: number; name: string; photo: string | null; role_type: string }[];
+  cast_crew?: { cast_crew_id: number; name: string; photo: string | null; role_type: string; character_name?:string | null; display_order?:number }[];
   production_companies?: Company[];
   seasons?: { season_id: number; season_number: number; total_episode: number }[];
 };
-export type User = { user_id: number; name: string; email: string; role: string | null; avatar?: string | null; created_at?: string };
+export type User = { user_id: number; name: string; email: string; role: string | null; suspended?: boolean; suspension_reason?: string | null; suspended_until?: string | null; avatar?: string | null; created_at?: string };
 export type Company = { company_id: number; name: string; country: string | null; logo: string | null };
 export type Person = {
   cast_crew_id: number; name: string; photo: string | null; biography: string | null;
@@ -33,7 +33,7 @@ function apiBase() {
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const base = apiBase();
-  const timeout = path === '/api/account/forgot-password' ? 45000 : 15000;
+  const timeout = 15000;
   const response = await fetch(base.replace(/\/$/, "") + path, {
     ...options, credentials: "include",
     signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),

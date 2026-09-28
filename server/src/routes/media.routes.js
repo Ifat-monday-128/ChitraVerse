@@ -5,6 +5,7 @@ const mediaController = require("../controllers/media.controller");
 const router = express.Router();
 const pool = require('../config/db');
 router.use(require('./awards.routes'));
+router.use(require('./community.routes').public);
 
 // Catalog and published stories are public; account writes remain authenticated.
 router.get('/community', async (req, res) => {
@@ -31,7 +32,9 @@ router.get('/home/interests', async (req, res, next) => {
   catch (error) { next(error); }
 });
 router.get('/home/box-office', async (req, res, next) => {
-  try { res.json(await require('../services/home-discovery.service').boxOffice()); }
+  const genre = req.query.genre;
+  if ((genre !== undefined && (typeof genre !== 'string' || !/^[1-9]\d*$/.test(genre) || Number(genre)>2147483647)) || (req.query.market && req.query.market !== 'worldwide')) return res.status(400).json({error:'Choose a valid genre and Worldwide market.'});
+  try { res.json(await require('../services/home-discovery.service').boxOffice(genre ? Number(genre) : null)); }
   catch (error) { next(error); }
 });
 router.get('/home/birthdays', async (req, res, next) => {

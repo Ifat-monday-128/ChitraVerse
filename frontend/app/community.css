@@ -7,3 +7,5 @@
 @media(prefers-reduced-motion:reduce){.dialog .community-form .community-tag-fields{animation:none}}
 
 .community-logo{display:block;margin:0 auto 20px;width:80px;height:80px}
+
+.story-comments{border-top:1px solid #ffffff22;padding-top:1rem}.story-comments article{padding:1rem 0;border-bottom:1px solid #ffffff15}.story-comments small{color:var(--muted)}.story-actions textarea{min-height:90px}.moderation-panel{max-width:1100px;margin:auto}.moderation-panel .community-post{margin:20px 0}.moderation-panel details{margin:16px 0}.moderation-panel details button{display:block}.moderation-panel .detail-actions{flex-wrap:wrap}.moderation-panel select{max-width:100%}

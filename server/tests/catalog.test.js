@@ -9,12 +9,11 @@ const schema = `features_${process.pid}_${Date.now()}`;
 const admin = new Pool({host:process.env.DB_HOST,port:Number(process.env.DB_PORT||5432),user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME,options:''});
 process.env.PGOPTIONS = `-c search_path=${schema},public`;
 const pool = require('../src/config/db');
-const mail = require('../src/services/mail.service');
 const importer = require('../src/services/tmdb-import.service');
 const app = require('../src/app');
 app.set('trust proxy','loopback'); // Only this isolated test app trusts its test client.
 const password = 'Original password 123!';
-let server, base, inbox = [], address = 0;
+let server, base, address = 0;
 const hash = value => {const salt=randomBytes(16).toString('hex');return `scrypt:${salt}:${scryptSync(value,salt,64).toString('hex')}`;};
 test.before(async()=>{
   await admin.query(`CREATE SCHEMA ${schema}`);
@@ -23,21 +22,13 @@ test.before(async()=>{
   for(const role of ['user','admin']) await pool.write('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$1)',[role,`${role}@example.invalid`,hash(password)]);
   server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${server.address().port}`;
 });
-test.beforeEach(async()=>{
-  address++;inbox=[];
-  mail.configured=()=>true;mail.sendResetCode=async(email,code)=>{inbox.push({email,code});};
-  await pool.write('DELETE FROM password_reset');
-  await pool.write("UPDATE users SET password_hash=$1 WHERE email='user@example.invalid'",[hash(password)]);
-});
+test.beforeEach(()=>{address++;});
 test.after(async()=>{if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await pool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();});
 async function request(route,body,cookie,method=body?'POST':'GET') {
   const response=await fetch(base+route,{method,headers:{'Content-Type':'application/json','X-Forwarded-For':`192.0.2.${address}`,...(cookie?{Cookie:cookie}:{})},...(body?{body:JSON.stringify(body)}:{})});
   return {status:response.status,body:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
 }
 const login = (role='user',pass=password)=>request('/api/account/login',{email:`${role}@example.invalid`,password:pass});
-const send = (email='user@example.invalid')=>request('/api/account/forgot-password',{email});
-const reset = (code,pass='New password 456!')=>request('/api/account/reset-password',{email:'user@example.invalid',code,password:pass});
-
 test('catalog is public while private account requests reject missing and logged-out sessions',async()=>{
   const cookie=(await login()).cookie;
   for(const route of ['/api/media/home','/api/media/search','/api/media/community','/api/media/people']) {
@@ -50,47 +41,6 @@ test('catalog is public while private account requests reject missing and logged
   await request('/api/account/logout',{},cookie);
   assert.equal((await request('/api/media/home',null,cookie)).status,200);
   assert.equal((await request('/api/account/me',null,cookie)).status,401);
-});
-test('OTP is hashed, email response is generic, reset is single-use and revokes sessions',async()=>{
-  const cookie=(await login()).cookie;
-  const sent=await send();assert.equal(sent.status,200);assert.equal(inbox.length,1);
-  const code=inbox[0].code;assert.match(code,/^\d{6}$/);
-  const stored=(await pool.query('SELECT code_hash FROM password_reset')).rows[0].code_hash;
-  assert.notEqual(stored,code);assert.ok(!JSON.stringify(sent.body).includes(code));
-  const unknown=await send('missing@example.invalid');assert.deepEqual(unknown.body,sent.body);assert.equal(inbox.length,1);
-  await send();assert.equal(inbox.length,1,'cooldown prevents another email');
-  assert.equal((await reset(code)).status,200);
-  assert.equal((await reset(code)).status,400);
-  assert.equal((await request('/api/account/me',null,cookie)).status,401);
-  assert.equal((await login()).status,401);
-  assert.equal((await login('user','New password 456!')).status,200);
-  assert.match((await pool.query("SELECT password_hash FROM users WHERE role='user'")).rows[0].password_hash,/^scrypt:/);
-});
-test('expired and exhausted OTPs fail; resend invalidates the previous code',async()=>{
-  await send();const old=inbox[0].code;
-  await pool.write("UPDATE password_reset SET expires_at=now()-interval '1 second',sent_at=now()-interval '2 minutes'");
-  assert.equal((await reset(old)).status,400);
-  await send();const current=inbox[1].code;
-  const wrong=current==='000000'?'111111':'000000';
-  for(let i=0;i<5;i++)assert.equal((await reset(wrong)).status,400);
-  assert.equal((await pool.query('SELECT attempts FROM password_reset')).rows[0].attempts,5);
-  assert.equal((await reset(current)).status,400);
-  await pool.write("UPDATE password_reset SET sent_at=now()-interval '2 minutes'");
-  await send();assert.equal((await reset(inbox[2].code)).status,200);
-});
-test('delivery failure rolls back challenge; missing configuration and malformed fields are explicit',async()=>{
-  assert.equal((await send('invalid')).status,400);
-  assert.equal((await reset('abc')).status,400);
-  mail.configured=()=>false;assert.equal((await send()).status,503);
-  mail.configured=()=>true;mail.sendResetCode=async()=>{throw new Error('SMTP unavailable');};
-  assert.equal((await send()).status,503);
-  assert.equal((await pool.query('SELECT * FROM password_reset')).rowCount,0);
-});
-test('only one concurrent reset can consume a code; request throttling is enforced',async()=>{
-  await send();const results=await Promise.all([reset(inbox[0].code),reset(inbox[0].code)]);
-  assert.deepEqual(results.map(r=>r.status).sort(),[200,400]);
-  for(let i=0;i<12;i++)await send('missing@example.invalid');
-  assert.equal((await send()).status,429);
 });
 test('procedure changes both tables, preserves imported scores, and rollback undoes the workflow',async()=>{
   const args=[null,'movie','Procedure film','Synopsis','en',null,null,'2020-01-01',120];

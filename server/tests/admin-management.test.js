@@ -75,13 +75,13 @@ test('admin access changes revoke sessions and prevent self demotion', async () 
   assert.equal((await request('/me', viewer)).status, 401);
 });
 
-test('moderation lists and removes community content only for administrators', async () => {
+test('legacy moderation deletion is disabled in favor of audited report actions', async () => {
   const adminCookie = (await login('admin')).cookie, viewer = (await login('second')).cookie;
   const id = (await pool.query("INSERT INTO community_post(user_id,title,content) SELECT user_id,'Moderation fixture','A fixture comment' FROM users WHERE name='second' RETURNING post_id")).rows[0].post_id;
   assert.equal((await request('/admin/moderation', viewer)).status, 403);
   assert.equal((await request(`/admin/moderation/story/${id}`, viewer, null, 'DELETE')).status, 403);
   assert.equal((await request('/admin/moderation?q=Moderation%20fixture', adminCookie)).data.items[0].id, id);
-  assert.equal((await request(`/admin/moderation/story/${id}`, adminCookie, null, 'DELETE')).status, 200);
+  assert.equal((await request(`/admin/moderation/story/${id}`, adminCookie, null, 'DELETE')).status, 404);
   assert.equal((await request(`/admin/moderation/story/${id}`, adminCookie, null, 'DELETE')).status, 404);
 });
 

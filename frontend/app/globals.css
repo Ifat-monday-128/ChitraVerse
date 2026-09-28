@@ -332,3 +332,5 @@ button:active:not(:disabled) { translate: 0 1px; }
 }
 
 .hero.compact.search-page-hero { min-height: 0; }
+
+.saved-badge{position:absolute;top:10px;left:8px;right:8px;z-index:2;padding:6px;border-radius:5px;color:#f2deb0;background:#151b18e8;font-size:10px}.missing-poster{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;padding:24px;text-align:center;background:radial-gradient(ellipse at top,#403b2b,#171c22);min-height:100%;aspect-ratio:2/3;color:#d6c69a}.missing-poster>span{font-size:42px}.missing-poster strong{font-size:16px}.missing-poster small{font-size:10px;color:#a1a5aa}

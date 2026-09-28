@@ -288,14 +288,6 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE IF NOT EXISTS password_reset (
-  user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
-  code_hash TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  attempts INT NOT NULL DEFAULT 0,
-  sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 -- TMDB movie IDs and TV IDs belong to separate namespaces.
 ALTER TABLE media ADD COLUMN IF NOT EXISTS tmdb_type VARCHAR(5);
 UPDATE media m SET tmdb_type=CASE
@@ -315,3 +307,74 @@ ALTER TABLE awards ADD COLUMN IF NOT EXISTS retrieved_at TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_awards_source ON awards(title_id,source_key);
 CREATE INDEX IF NOT EXISTS idx_awards_title ON awards(title_id);
 CREATE INDEX IF NOT EXISTS idx_awards_year ON awards(year);
+
+CREATE TABLE IF NOT EXISTS media_comment (
+  comment_id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  title_id INT NOT NULL REFERENCES media(title_id) ON DELETE CASCADE,
+  content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 2000),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_media_comment_title ON media_comment(title_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS community_post (
+  post_id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
+  content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 10000),
+  media_id INT REFERENCES media(title_id) ON DELETE SET NULL,
+  cast_crew_id INT REFERENCES cast_crew(cast_crew_id) ON DELETE SET NULL,
+  genre_id INT REFERENCES genre(genre_id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_community_post_feed ON community_post(created_at DESC, post_id DESC);
+
+-- Additive and rerunnable: existing accounts, posts and catalog data are retained.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ;
+ALTER TABLE community_post ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE community_post ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS community_comment (
+  comment_id SERIAL PRIMARY KEY,
+  post_id INT NOT NULL REFERENCES community_post(post_id) ON DELETE CASCADE,
+  user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  content TEXT NOT NULL CHECK(length(trim(content)) BETWEEN 1 AND 2000),
+  hidden BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_community_comment_post ON community_comment(post_id,comment_id);
+CREATE TABLE IF NOT EXISTS community_report (
+  report_id SERIAL PRIMARY KEY,
+  post_id INT REFERENCES community_post(post_id) ON DELETE SET NULL,
+  reporter_id INT REFERENCES users(user_id) ON DELETE SET NULL,
+  reason TEXT NOT NULL CHECK(reason IN ('Spam','Harassment','Hate or abusive content','Inappropriate content','Misinformation','Other')),
+  explanation TEXT NOT NULL DEFAULT '' CHECK(length(explanation)<=2000),
+  status TEXT NOT NULL DEFAULT 'Open' CHECK(status IN ('Open','Under Review','Escalated','Resolved','Dismissed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_report_open ON community_report(post_id,reporter_id) WHERE status IN ('Open','Under Review','Escalated');
+CREATE INDEX IF NOT EXISTS idx_report_queue ON community_report(status,report_id);
+CREATE TABLE IF NOT EXISTS moderation_action (
+  action_id SERIAL PRIMARY KEY,
+  actor_id INT REFERENCES users(user_id) ON DELETE SET NULL,
+  target_type TEXT NOT NULL,
+  target_id INT NOT NULL,
+  report_id INT REFERENCES community_report(report_id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK(length(trim(reason)) BETWEEN 1 AND 2000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_moderation_target ON moderation_action(target_type,target_id,action_id);
+CREATE TABLE IF NOT EXISTS admin_notification (
+  notification_id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  report_id INT NOT NULL REFERENCES community_report(report_id) ON DELETE CASCADE,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id,report_id)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_user ON admin_notification(user_id,notification_id);
+ALTER TABLE media_cast_crew ADD COLUMN IF NOT EXISTS character_name TEXT;
+ALTER TABLE media_cast_crew ADD COLUMN IF NOT EXISTS display_order INT NOT NULL DEFAULT 0;
+ALTER TABLE awards ADD COLUMN IF NOT EXISTS result TEXT CHECK(result IN ('Won','Nominated'));
+ALTER TABLE awards ADD COLUMN IF NOT EXISTS recipient TEXT;

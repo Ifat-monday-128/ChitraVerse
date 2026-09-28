@@ -79,7 +79,7 @@ export default function Community({user,signIn,sessionExpired,openTitle,openPers
       <div className="community-feed-heading"><h2>Latest stories</h2><span>Newest first</span></div>
       {error&&<div className="message error" role="alert">{error}<button disabled={loading||loadingMore} onClick={()=>setRetry(r=>r+1)}>Retry loading</button></div>}
       {loading?<div className="community-loading" role="status"><span>Loading community…</span><div/><div/></div>:!posts.length&&!error?<div className="community-empty"><span aria-hidden="true">✎</span><h3>Be the first voice.</h3><p>Share a review, a discovery, or a new perspective on a favorite film.</p><button className="primary-button" onClick={openComposer}>Write the first story</button></div>:null}
-      <div className="community-posts" aria-busy={loadingMore}>{posts.map(p=><CommunityStory key={p.post_id} post={p} openTitle={openTitle} openPerson={openPerson} openGenre={openGenre} />)}</div>
+      <div className="community-posts" aria-busy={loadingMore}>{posts.map(p=><CommunityStory key={p.post_id} post={p} user={user} signIn={signIn} changed={()=>setRetry(r=>r+1)} openTitle={openTitle} openPerson={openPerson} openGenre={openGenre} />)}</div>
       {hasMore&&<button className="secondary-button community-more" disabled={loadingMore||busy||loading} onClick={more}>{loadingMore?'Loading stories…':'Load more stories'}</button>}
       {!hasMore&&posts.length>0&&!loading&&<p className="community-feed-end">You&apos;re all caught up. There&apos;s always another story to tell.</p>}
     </div></div>

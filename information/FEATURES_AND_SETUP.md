@@ -1,22 +1,5 @@
 # Project features and setup
 
-## Gmail password reset setup
-
-In `server/.env`, fill in the two empty settings:
-
-```dotenv
-GMAIL_USER=your-sender@gmail.com
-GMAIL_APP_PASSWORD=your_google_app_password
-```
-
-Enable 2-Step Verification on the sender's Google account, then create an App Password. Use that App Password, not the normal Gmail password. Restart the backend after saving `.env`. Never commit or share this file. See [Nodemailer's Gmail guide](https://nodemailer.com/guides/using-gmail).
-
-On the sign-in screen, select **Forgot password?**, enter the email address of an existing ChitraVerse account, and request a code. Enter the emailed six-digit code and a new password, then select **Verify code & reset password**. The new password must have 8-128 characters.
-
-The server stores a salted scrypt hash of the code. Codes expire after 10 minutes and are single-use; five wrong attempts invalidate a code. Resending requires a 60-second wait and replaces the old code. Requests are rate limited by IP. A successful reset changes the password hash and deletes all account sessions and the reset challenge in the same transaction. A normal authenticated password change also invalidates outstanding reset codes.
-
-Known and unknown emails receive the same successful request message. Missing Gmail configuration and SMTP failures return an actionable error. Automated tests substitute the mail sender; real inbox delivery must be checked after configuring Gmail.
-
 ## Import a movie or TV series
 
 Sign in as an administrator, open catalog management, and select **+ Add title**. The TMDB import section appears above the manual fields. Paste a link such as `https://www.themoviedb.org/movie/774` or a TV link in the form `https://www.themoviedb.org/tv/ID`, then select **Fetch & add from TMDB**.
@@ -70,6 +53,6 @@ CALL save_catalog_title(NULL::int, 'movie'::text, 'Demonstration title'::text,
 ROLLBACK;
 ```
 
-The schema changes are migration `005` (function, procedure, password reset table) and `006` (TMDB identity column/index). Existing catalog/user tables and their primary keys remain intact. The server applies migrations at startup; `npm.cmd run migrate` can apply them explicitly. Do not rerun the base schema on an existing database.
+The schema changes are migration `005` (function and procedure) and `006` (TMDB identity column/index). Existing catalog/user tables and their primary keys remain intact. The server applies migrations at startup; `npm.cmd run migrate` can apply them explicitly. Do not rerun the base schema on an existing database.
 
 Run `npm.cmd test` for backend integration tests, frontend build, typecheck, and rendered-HTML checks. `npm.cmd --prefix frontend run lint` checks frontend lint. These checks do not replace practicing the viva: explain why each transaction, function, procedure, and trigger is used.

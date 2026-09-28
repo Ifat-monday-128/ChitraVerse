@@ -3,7 +3,6 @@ import BrandWordmark from './brand-wordmark';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import './auth-screen.css';
-import PasswordReset from './password-reset';
 import AuthPosters from './auth-posters';
 
 type AuthScreenProps = {
@@ -17,7 +16,6 @@ type AuthScreenProps = {
 };
 
 export default function AuthScreen({ requiredSignIn = false, register, busy, error, close, toggleMode, submit }: AuthScreenProps) {
-  const [reset, setReset] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const [showPassword, setShowPassword] = useState(false);
   useEffect(() => {
@@ -36,8 +34,8 @@ export default function AuthScreen({ requiredSignIn = false, register, busy, err
         <AuthPosters />
         <div className="auth-panel-area">
           <section className="auth-glass" aria-labelledby="auth-heading">
-            <div className="auth-intro"><h2 id="auth-heading">{reset ? 'Reset your password.' : register ? 'Join the story.' : 'Welcome back.'}</h2><p>{reset ? 'We will email a verification code to your account address.' : register ? 'Create an account and start your own movie collection.' : 'Sign in to pick up where you left off.'}</p></div>
-            {reset ? <PasswordReset back={() => { setReset(false); if(register) toggleMode(); }} /> : <form className="auth-form" onSubmit={submit} aria-busy={busy} aria-describedby={error ? 'auth-error' : undefined}>
+            <div className="auth-intro"><h2 id="auth-heading">{register ? 'Join the story.' : 'Welcome back.'}</h2><p>{register ? 'Create an account and start your own movie collection.' : 'Sign in to pick up where you left off.'}</p></div>
+            <form className="auth-form" onSubmit={submit} aria-busy={busy} aria-describedby={error ? 'auth-error' : undefined}>
               <fieldset disabled={busy}>
                 {register && <div className="auth-field"><label htmlFor="auth-name">Your name</label><input id="auth-name" name="name" autoComplete="name" placeholder="How should we call you?" required maxLength={255} /></div>}
                 <div className="auth-field"><label htmlFor="auth-email">Email address</label><input id="auth-email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" required maxLength={255} autoFocus /></div>
@@ -46,8 +44,8 @@ export default function AuthScreen({ requiredSignIn = false, register, busy, err
               {error && <p id="auth-error" className="auth-error" role="alert">{error}</p>}
               <button type="submit" className="auth-submit" disabled={busy}><span>{busy ? (register ? 'Creating your account…' : 'Signing you in…') : (register ? 'Create account' : 'Sign in')}</span>{busy ? <span className="auth-spinner" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}</button>
               <p className="auth-security"><span className="auth-lock" aria-hidden="true" />Your next great watch is waiting.</p>
-            {!register && <button type="button" className="text-button" disabled={busy} onClick={() => setReset(true)}>Forgot password?</button>}</form>}
-            {!reset && <div className="auth-switch"><span>{register ? 'Already part of ChitraVerse?' : 'New to ChitraVerse?'}</span><button type="button" disabled={busy} onClick={() => { setShowPassword(false); toggleMode(); }}>{register ? 'Sign in' : 'Create an account'} <span aria-hidden="true">→</span></button></div>}
+            </form>
+            <div className="auth-switch"><span>{register ? 'Already part of ChitraVerse?' : 'New to ChitraVerse?'}</span><button type="button" disabled={busy} onClick={() => { setShowPassword(false); toggleMode(); }}>{register ? 'Sign in' : 'Create an account'} <span aria-hidden="true">→</span></button></div>
           </section>
           <p className="auth-panel-caption">A WORLD OF CINEMA. ONE PLACE TO CALL YOURS.</p>
         </div>

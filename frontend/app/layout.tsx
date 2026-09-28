@@ -14,7 +14,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{__html: `
+          try {
+            var theme = localStorage.getItem('chitraverse-theme') || 'red';
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'custom') {
+              var customColor = localStorage.getItem('chitraverse-custom-color') || '#ffffff';
+              document.documentElement.style.setProperty('--custom-accent', customColor);
+            }
+          } catch (e) {}
+        `}} />
+      </head>
       <body>{children}</body>
     </html>
   );

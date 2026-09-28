@@ -11,7 +11,7 @@ export function PersonPhoto({ name, photo }: { name: string; photo: string | nul
   if (!src || failed) return <div className="person-placeholder" role="img" aria-label={`Photo unavailable for ${name}`}><span>{name.split(" ").map(part => part[0]).slice(0, 2).join("")}</span><small>Photo unavailable</small></div>;
   // TMDB serves sized portraits directly.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={name} loading="lazy" onError={() => setFailed(true)} />;
+  return <img src={src} alt={name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 
 const dateLabel = (date: string | null) => date ? new Intl.DateTimeFormat("en", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date.slice(0, 10)}T00:00:00Z`)) : "Not available";

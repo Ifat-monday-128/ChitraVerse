@@ -1,0 +1,133 @@
+.theme-picker {
+  margin: 16px 0;
+  padding: 0 16px;
+}
+
+.theme-picker-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.theme-options {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.theme-option {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.theme-option:hover {
+  transform: scale(1.15);
+}
+
+.theme-option.active {
+  transform: scale(1.15);
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+}
+
+.custom-picker-container {
+  position: relative;
+}
+
+.custom-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-icon {
+  position: relative;
+  z-index: 1;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  pointer-events: none;
+}
+
+.color-popover {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  z-index: 100;
+  background: var(--surface-raised);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.9), 0 0 0 1px var(--border);
+  animation: popover-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.color-popover .react-colorful {
+  width: 200px;
+  height: 200px;
+}
+
+.rgb-inputs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rgb-inputs label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.rgb-inputs span {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.rgb-inputs input {
+  width: 100%;
+  padding: 6px 0;
+  text-align: center;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font-size: 13px;
+  -moz-appearance: textfield;
+}
+
+.rgb-inputs input::-webkit-outer-spin-button,
+.rgb-inputs input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rgb-inputs input:focus {
+  outline: none;
+  border-color: var(--accent);
+}

@@ -9,7 +9,7 @@
   letter-spacing: .025em;
   line-height: 1.3;
   color: #ebd8a5;
-  text-shadow: 0 2px 18px #e5091426;
+  text-shadow: 0 2px 18px color-mix(in srgb, var(--accent) 15%, transparent);
   white-space: nowrap;
 }
 .site-wordmark > span,

@@ -10,7 +10,7 @@ export function Poster({ item }: { item: Media }) {
   if (!src || failed) return <div className="missing-poster"><span aria-hidden="true">▤</span><strong>{item.title}</strong><small>No poster available</small></div>;
   // Database poster URLs use TMDB's already-sized images, including a missing-image state.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={`${item.title} poster`} loading="lazy" onError={() => setFailed(true)} />;
+  return <img src={src} alt={`${item.title} poster`} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 export default function Card({ item, open, index }: { item: Media; open: (id: number) => void; index: number }) {
   const {saved}=useLibrary();

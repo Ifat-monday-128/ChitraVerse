@@ -7,6 +7,7 @@ import AdminHomepage from './admin-homepage';
 import AdminManagement from './admin-management';
 import Moderation from './moderation';
 import Community from './community';
+import ThemePicker from './theme-picker';
 import './admin-dashboard.css';
 
 type Summary = { totals: Record<string,number>; roles: {role:string;count:number}[]; users: User[]; activity: {kind:string;id:number;name:string;title:string;detail?:string;occurred_at:string}[]; registrations: {day:string;count:number}[]; updated_at:string };
@@ -36,6 +37,7 @@ export default function AdminDashboard(props:Props) {
     <aside className={`admin-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}><a className="admin-wordmark" href="/" aria-label="ChitraVerse homepage">CHITRA<span>VERSE</span><small>ADMINISTRATION</small></a>
       <div className="admin-identity"><span className="admin-avatar">{props.user.avatar?<img src={props.user.avatar} alt=""/>:props.user.name.slice(0,2).toUpperCase()}</span><strong>{props.user.name}</strong><small>Administrator</small></div>
       <nav aria-label="Admin navigation">{(['Overview','Catalog','Accounts','Moderation','Users & activity','Online Users','Manage homepage','CVCommunity'] as Tab[]).map((item,index)=><button key={item} onClick={()=>navigate(item)} aria-current={tab===item?'page':undefined}><span aria-hidden="true">{['\u25eb','\u25a3','\u25ce','\u25c7','\u25f7','\u25c9','\u25c8','\u270e'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}</nav>
+      <ThemePicker />
       <a className="admin-back-home" href="/"><span aria-hidden="true">←</span> Back to homepage</a>
       <button className="admin-logout" disabled={props.busy} onClick={props.logout}>{props.busy?'Signing out…':'Sign out'}<span aria-hidden="true">↗</span></button>
     </aside>

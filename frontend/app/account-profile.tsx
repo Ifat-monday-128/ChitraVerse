@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, posterUrl, type Media, type User } from './api';
+import ThemePicker from './theme-picker';
 import './account-profile.css';
 
 type Profile = { user: User; counts: { favorites: number; playlists: number; ratings: number; stories: number }; favorites: Media[]; playlists: { watchlist_id: number; name: string; title_count: number }[] };
@@ -84,7 +85,7 @@ export default function AccountProfile(props: AccountProfileProps) {
   }
   const displayedUser = profile?.user || props.user;
   function navigate(next: Tab) { if (next === 'Activity' && tab !== next) { setActivityLoading(true); setActivityError(''); } setTab(next); setSuccess(''); if (profile) setError(''); }
-  function portrait(photo: string | null | undefined, large = false) { return <span className={`account-portrait ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${displayedUser.name}'s profile`} /> : <span>{displayedUser.name.slice(0, 2).toUpperCase()}</span>}</span>; }
+  function portrait(photo: string | null | undefined, large = false) { return <span className={`account-portrait ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${displayedUser.name}'s profile`} referrerPolicy="no-referrer" /> : <span>{displayedUser.name.slice(0, 2).toUpperCase()}</span>}</span>; }
   return <section className="account-hub" aria-label="Account dashboard">
     <button className="sidebar-toggle secondary-button" aria-expanded={sidebarOpen} onClick={()=>setSidebarOpen(!sidebarOpen)}>Menu: Account navigation</button>
     <aside className={`account-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -93,6 +94,7 @@ export default function AccountProfile(props: AccountProfileProps) {
       <nav aria-label="Account sections">{(['Overview', 'My account', 'Activity', 'Security'] as Tab[]).map((item, index) => <button type="button" key={item} className={tab === item ? 'active' : ''} aria-current={tab === item ? 'page' : undefined} onClick={() => navigate(item)}><span aria-hidden="true">{['◫', '◎', '◷', '◇'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}
         {!admin && <><p>YOUR LIBRARY</p><button onClick={props.favorites}><span aria-hidden="true">♡</span>Favorites<b aria-hidden="true">›</b></button><button onClick={props.watchlists}><span aria-hidden="true">▤</span>Playlists<b aria-hidden="true">›</b></button></>}
       </nav>
+      <ThemePicker />
       <button className="account-signout" onClick={props.logout} disabled={props.busy || saving}>{props.busy ? 'Signing out…' : 'Sign out'}<span aria-hidden="true">↗</span></button>
     </aside>
     <div className="account-main">
@@ -105,7 +107,7 @@ export default function AccountProfile(props: AccountProfileProps) {
         <div className="account-quick-actions"><button onClick={() => navigate('My account')}><span aria-hidden="true">◎</span><div><strong>My account</strong><small>Update your name and profile photo</small></div><b aria-hidden="true">↗</b></button><button onClick={() => navigate('Security')}><span aria-hidden="true">◇</span><div><strong>Password & security</strong><small>A little peace of mind for your account</small></div><b aria-hidden="true">↗</b></button></div>
         {admin ? <div className="account-quick-actions"><button onClick={props.dashboard}><span aria-hidden="true">◈</span><div><strong>Admin Dashboard</strong><small>View system stats and overview</small></div><b aria-hidden="true">↗</b></button><button onClick={props.homepage}><span aria-hidden="true">▤</span><div><strong>Manage homepage</strong><small>Edit featured titles</small></div><b aria-hidden="true">↗</b></button><button onClick={props.activity}><span aria-hidden="true">◎</span><div><strong>Users & activity</strong><small>Manage users and see reports</small></div><b aria-hidden="true">↗</b></button></div> : <>
           <div className="account-section-heading"><h2>On your favorites shelf</h2><button className="text-button" onClick={props.favorites}>View all ↗</button></div>
-          {profile?.favorites.length ? <div className="account-favorites">{profile.favorites.map(item => <button key={item.title_id} onClick={() => props.openTitle(item.title_id)}><span className="account-poster">{posterUrl(item.poster) ? <img src={posterUrl(item.poster)} alt="" loading="lazy" /> : <span>No poster</span>}<span className="account-poster-heart" aria-hidden="true">♥</span></span><strong>{item.title}</strong><small>{item.media_type === 'movie' ? 'Movie' : 'TV series'}{item.tmdb_rating ? ` · ★ ${item.tmdb_rating}` : ''}</small></button>)}</div> : <div className="account-empty"><span aria-hidden="true">♡</span><h3>Your favorites belong here.</h3><p>Tap the favorite button on a movie or series to start your collection.</p><button className="text-button" onClick={props.favorites}>Explore favorites ↗</button></div>}
+          {profile?.favorites.length ? <div className="account-favorites">{profile.favorites.map(item => <button key={item.title_id} onClick={() => props.openTitle(item.title_id)}><span className="account-poster">{posterUrl(item.poster) ? <img src={posterUrl(item.poster)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span>No poster</span>}<span className="account-poster-heart" aria-hidden="true">♥</span></span><strong>{item.title}</strong><small>{item.media_type === 'movie' ? 'Movie' : 'TV series'}{item.tmdb_rating ? ` · ★ ${item.tmdb_rating}` : ''}</small></button>)}</div> : <div className="account-empty"><span aria-hidden="true">♡</span><h3>Your favorites belong here.</h3><p>Tap the favorite button on a movie or series to start your collection.</p><button className="text-button" onClick={props.favorites}>Explore favorites ↗</button></div>}
           <div className="account-section-heading"><h2>Made for your next movie night</h2><button className="text-button" onClick={props.watchlists}>All playlists ↗</button></div>
           {profile?.playlists.length ? <div className="account-playlists">{profile.playlists.map(list => <button key={list.watchlist_id} onClick={() => props.openList(list.watchlist_id)}><span aria-hidden="true">▤</span><div><strong>{list.name}</strong><small>{list.title_count} {list.title_count === 1 ? 'title' : 'titles'} · Watchlist</small></div><b aria-hidden="true">↗</b></button>)}</div> : <div className="account-empty compact"><p>A weekend marathon or a list of hidden gems? Give your next watch a home.</p><button className="secondary-button" onClick={props.watchlists}>Create a playlist</button></div>}
         </>}

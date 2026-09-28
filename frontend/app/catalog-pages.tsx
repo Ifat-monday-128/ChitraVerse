@@ -82,7 +82,7 @@ export function CompanyLogo({ company }: { company: Company }) {
   if (!src || failed) return <span className="company-monogram" aria-label={`${company.name} logo unavailable`}>{company.name.split(' ').map(word => word[0]).slice(0, 2).join('')}</span>;
   // Company logos use the existing TMDB image source.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={`${company.name} logo`} loading="lazy" onError={() => setFailed(true)} />;
+  return <img src={src} alt={`${company.name} logo`} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 
 export function ProductionCredits({ companies, openCompany }: { companies: Company[]; openCompany: (id: number) => void }) {

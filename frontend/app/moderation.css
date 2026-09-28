@@ -4,7 +4,7 @@
 .moderation-title-area p { margin: 0; color: #a1a6a3; font-size: 14px; }
 .moderation-controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .moderation-select { padding: 10px 16px; background: #00000033; border: 1px solid #ffffff1a; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
-.moderation-select:focus, .moderation-select:hover { border-color: var(--accent); box-shadow: 0 0 0 3px #e509141a; }
+.moderation-select:focus, .moderation-select:hover { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
 .moderation-notifications { background: #23282b; border: 1px solid #ffffff14; border-radius: 14px; overflow: hidden; }
 .moderation-notifications summary { padding: 16px 20px; cursor: pointer; font-weight: 700; color: #d0d4d1; list-style: none; display: flex; align-items: center; justify-content: space-between; }
 .moderation-notifications summary::-webkit-details-marker { display: none; }

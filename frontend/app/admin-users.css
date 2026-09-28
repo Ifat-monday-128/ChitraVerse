@@ -140,7 +140,7 @@
 }
 .admin-user-role.admin {
   background: rgba(229, 9, 20, 0.1);
-  color: #e50914;
+  color: var(--accent);
   border: 1px solid rgba(229, 9, 20, 0.2);
 }
 .admin-user-role.user {

@@ -99,7 +99,7 @@ account.patch('/moderation/reports/:reportId',wrap(async(req,res)=>{
  const {rows:[post]}=await db.query('SELECT * FROM community_post WHERE post_id=$1 FOR UPDATE',[report.post_id]);
  if(['hide','unhide','delete','suspend','unsuspend'].includes(action)&&!post)throw fail(409,'The story has already been removed. You can resolve or dismiss this report.');
  if(['hide','unhide','delete'].includes(action)&&post.deleted_at)throw fail(409,'This story has already been removed.');
- if(action==='delete') {if(req.body.confirmation!==post.title)throw fail(400,'Confirm deletion using the story title.');await db.query('UPDATE community_post SET deleted_at=now() WHERE post_id=$1',[post.post_id]);}
+ if(action==='delete') {await db.query('UPDATE community_post SET deleted_at=now() WHERE post_id=$1',[post.post_id]);}
  if(action==='hide'||action==='unhide')await db.query('UPDATE community_post SET hidden=$1 WHERE post_id=$2',[action==='hide',post.post_id]);
  if(action==='suspend'||action==='unsuspend')await changeSuspension(db,req.user,post.user_id,action,why,req.body?.expires_at,reportId);
  const status={review:'Under Review',escalate:'Escalated',dismiss:'Dismissed',resolve:'Resolved',delete:'Resolved'}[action];

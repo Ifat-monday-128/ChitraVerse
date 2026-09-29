@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { usePageState } from './page-state';
 
 export default function AnimatedDisclosure({ label, children, kind = 'filters' }: { label: ReactNode; children: ReactNode; kind?: 'filters' | 'search' }) {
-  const [open, setOpen] = useState(false);
+  const [storedOpen, setStoredOpen] = usePageState(`disclosure:${kind}:${typeof label === 'string' ? label : 'title-filters'}`, false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const open = kind === 'search' ? searchOpen : storedOpen;
+  const setOpen = kind === 'search' ? setSearchOpen : setStoredOpen;
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
   const content = useRef<HTMLDivElement>(null);

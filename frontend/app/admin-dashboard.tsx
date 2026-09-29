@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { usePageState, navigateHome } from './page-state';
 /* eslint-disable @next/next/no-html-link-for-pages -- Full navigation resets the custom History API router. */
 import { api, type User } from './api';
+import BrandWordmark from './brand-wordmark';
 import { AdminUsers, OnlineUsers } from './role-features';
 import AdminHomepage from './admin-homepage';
 import AdminManagement from './admin-management';
@@ -17,7 +19,7 @@ const date = (value:string) => new Date(value).toLocaleDateString(undefined,{mon
 
 export default function AdminDashboard(props:Props) {
   const [sidebarOpen,setSidebarOpen]=useState(false);
-  const [tab,setTab]=useState<Tab>('Overview');
+const [tab,setTab]=usePageState<Tab>('admin-tab', 'Overview');
   const [data,setData]=useState<Summary|null>(null);
   const [error,setError]=useState(''); const [loading,setLoading]=useState(true);
   const [retry,setRetry]=useState(0); const [notice,setNotice]=useState('');
@@ -34,11 +36,11 @@ export default function AdminDashboard(props:Props) {
   const maxJoins=Math.max(1,...(data?.registrations.map(row=>row.count)||[]));
   return <section className={`admin-workspace ${tab === 'Overview' ? 'admin-overview' : ''}`} aria-label="Administration">
     <button className="sidebar-toggle secondary-button" aria-expanded={sidebarOpen} onClick={()=>setSidebarOpen(!sidebarOpen)}>Menu: Admin navigation</button>
-    <aside className={`admin-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}><a className="admin-wordmark" href="/" aria-label="ChitraVerse homepage">CHITRA<span>VERSE</span><small>ADMINISTRATION</small></a>
+    <aside className={`admin-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}><a className="admin-wordmark" href="/" onClick={navigateHome} aria-label="ChitraVerse homepage"><BrandWordmark /><small>ADMINISTRATION</small></a>
       <div className="admin-identity"><span className="admin-avatar">{props.user.avatar?<img src={props.user.avatar} alt=""/>:props.user.name.slice(0,2).toUpperCase()}</span><strong>{props.user.name}</strong><small>Administrator</small></div>
       <nav aria-label="Admin navigation">{(['Overview','Catalog','Accounts','Moderation','Users & activity','Online Users','Manage homepage','CVCommunity'] as Tab[]).map((item,index)=><button key={item} onClick={()=>navigate(item)} aria-current={tab===item?'page':undefined}><span aria-hidden="true">{['\u25eb','\u25a3','\u25ce','\u25c7','\u25f7','\u25c9','\u25c8','\u270e'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}</nav>
       <ThemePicker />
-      <a className="admin-back-home" href="/"><span aria-hidden="true">←</span> Back to homepage</a>
+      <a className="admin-back-home" href="/" onClick={navigateHome}><span aria-hidden="true">←</span> Back to homepage</a>
       <button className="admin-logout" disabled={props.busy} onClick={props.logout}>{props.busy?'Signing out…':'Sign out'}<span aria-hidden="true">↗</span></button>
     </aside>
     <div className="admin-main">

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { usePageState } from './page-state';
 import { api, type User } from './api';
 import Dialog from './dialog';
 type Report={report_id:number;post_id:number|null;title:string|null;content:string|null;author:string|null;author_id:number|null;reason:string;explanation:string;status:string;hidden:boolean;deleted_at:string|null;created_at:string;history:{action_id:number;actor:string;action:string;reason:string;created_at:string}[]};
@@ -9,8 +10,8 @@ import Select from './custom-select';
 
 export default function Moderation({ user }: { user: User }) {
   const [rows, setRows] = useState<Report[]>([]);
-  const [status, setStatus] = useState('');
-  const [offset, setOffset] = useState(0);
+const [status, setStatus] = usePageState('reports-status', '');
+const [offset, setOffset] = usePageState('reports-offset', 0);
   const [more, setMore] = useState(false);
   const [version, setVersion] = useState(0);
   const [focus, setFocus] = useState<number | null>(null);
@@ -25,7 +26,6 @@ export default function Moderation({ user }: { user: User }) {
   const [action, setAction] = useState('review');
   const [reason, setReason] = useState('');
   const [expiry, setExpiry] = useState('');
-  const [confirmation, setConfirmation] = useState('');
 
   useEffect(() => {
     const c = new AbortController();
@@ -51,7 +51,7 @@ export default function Moderation({ user }: { user: User }) {
   }, [status, offset, version, focus]);
 
   function choose(r: Report, a: string) {
-    setSelected(r); setAction(a); setReason(''); setExpiry(''); setConfirmation(''); setError('');
+    setSelected(r); setAction(a); setReason(''); setExpiry(''); setError('');
   }
 
   return (
@@ -155,7 +155,7 @@ export default function Moderation({ user }: { user: User }) {
             try {
               await api(`/api/account/moderation/reports/${selected.report_id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ action, reason, confirmation, expires_at: expiry ? new Date(expiry).toISOString() : null })
+                body: JSON.stringify({ action, reason, expires_at: expiry ? new Date(expiry).toISOString() : null })
               });
               setSelected(null); setVersion(v => v + 1);
               window.dispatchEvent(new Event('chitraverse:reports-changed'));
@@ -173,7 +173,6 @@ export default function Moderation({ user }: { user: User }) {
             {action === 'delete' && (
               <>
                 <p>The story will be removed from public view and retained for Admin audit.</p>
-                <label>Type “{selected.title}” to confirm<input required value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
               </>
             )}
             {error && <p className="message error" role="alert">{error}</p>}

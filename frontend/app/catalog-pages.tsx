@@ -5,6 +5,7 @@ import { api, ApiError, posterUrl, type Company, type Media, type Results } from
 import { PersonPhoto } from './person-profile';
 import { TitleFilterPanel, PeopleFilterPanel, emptyFilters, emptyPeopleFilters, filterParams, sortNames } from './search-filters';
 import AnimatedDisclosure from './animated-disclosure';
+import { usePageState } from './page-state';
 
 function useDirectory<T>(path: string) {
   const [result, setResult] = useState<{ path: string; data?: T; error?: string } | null>(null);
@@ -60,8 +61,8 @@ function Pagination({ page, total, hasMore, change }: { page: number; total: num
 export function CastDirectory({ query, search, openPerson }: { query: string; search: (query: string) => void; openPerson: (id: number) => void }) {
   const [input, setInput] = useState(query);
   const [lastQuery,setLastQuery]=useState(query);
-  const [filters,setFilters]=useState({...emptyPeopleFilters});
-  const [page, setPage] = useState(0);
+const [filters,setFilters]=usePageState('cast-filters', {...emptyPeopleFilters});
+const [page, setPage] = usePageState('directory-page', 0);
   if(lastQuery!==query){setLastQuery(query);setInput(query);setPage(0);}
   const { data, error, retry } = useDirectory<{ items: { cast_crew_id: number; name: string; photo: string | null }[]; total: number; hasMore: boolean }>(`/api/media/people?${new URLSearchParams({ ...filters, q: query, limit: '36', offset: String(page * 36) })}`);
   return <section className="content-page cast-directory"><div className="directory-intro"><p className="eyebrow">THE PEOPLE BEHIND THE STORIES</p><h1>Cast &amp; crew</h1><p>Explore every face in our library. Discover their story, then dive into their movies and series.</p></div>
@@ -90,9 +91,9 @@ export function ProductionCredits({ companies, openCompany }: { companies: Compa
 }
 
 export function ProductionProfile({ id, renderItems }: { id: number; renderItems: (items: Media[]) => ReactNode }) {
-  const [page, setPage] = useState(0);
-  const [filters,setFilters]=useState({...emptyFilters,sort:'newest'});
-  const [query,setQuery]=useState('');
+  const [page, setPage] = usePageState('studio-page', 0);
+const [filters,setFilters]=usePageState('studio-filters', {...emptyFilters,sort:'newest'});
+const [query,setQuery]=usePageState('studio-query', '');
   const { data, error, retry } = useDirectory<Results & { company: Company }>(`/api/media/companies/${id}?${new URLSearchParams({...filterParams(filters),q:query,limit:'36',offset:String(page*36)})}`);
   return <div className="production-profile">{data && <section className="studio-hero"><div className="company-logo"><CompanyLogo key={id} company={data.company} /></div><div><p className="eyebrow">PRODUCTION HOUSE</p><h1>{data.company.name}</h1><p>{data.company.country || 'Cinema without borders'} · Explore the studio’s collection in ChitraVerse.</p></div></section>}
     <div className="section-heading"><div><p>THE STUDIO COLLECTION</p><h2>Movies &amp; series</h2></div></div>

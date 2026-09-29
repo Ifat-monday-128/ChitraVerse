@@ -31,7 +31,8 @@ const login = async (name, secret = password) => request('/login', null, { email
 
 test('catalog administration validates metadata, preserves scores, and requires confirmed deletion', async () => {
   const adminCookie = (await login('admin')).cookie, viewer = (await login('second')).cookie;
-  const film = { title: 'Admin catalog fixture', media_type: 'movie', description: 'Verified synopsis', release_date: '2026-09-23', runtime: 120 };
+  const poster = 'https://images.example.test/posters/fixture.png?size=large';
+  const film = { title: 'Admin catalog fixture', media_type: 'movie', description: 'Verified synopsis', poster, release_date: '2026-09-23', runtime: 120 };
   assert.equal((await request('/admin/catalog')).status, 401);
   assert.equal((await request('/admin/catalog', viewer, film)).status, 403);
   for (const invalid of [{ title: '' }, { release_date: '2026-02-30' }, { poster: 'javascript:alert(1)' }, { runtime: -2 }, { trailer_link: 'invalid' }]) {
@@ -40,6 +41,7 @@ test('catalog administration validates metadata, preserves scores, and requires 
   const created = await request('/admin/catalog', adminCookie, film);
   assert.equal(created.status, 201);
   const id = created.data.title_id;
+  assert.equal((await pool.query('SELECT poster FROM media WHERE title_id=$1', [id])).rows[0].poster, poster);
   assert.equal((await request('/admin/catalog?q=Admin%20catalog', adminCookie)).data.items[0].title_id, id);
   await pool.query('UPDATE media SET tmdb_rating=8.5 WHERE title_id=$1', [id]);
   assert.equal((await request(`/admin/catalog/${id}`, adminCookie, { ...film, title: 'Updated catalog fixture', tmdb_rating: 1 }, 'PUT')).status, 200);

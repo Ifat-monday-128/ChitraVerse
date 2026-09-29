@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { usePageState } from './page-state';
 import { api, posterUrl } from './api';
 import './awards.css';
 import Select from './custom-select';
@@ -18,8 +19,8 @@ function AwardList({awards}:{awards:Award[]}) {
     {awards.length>3&&<details className="award-more"><summary>Show {awards.length-3} more records</summary><ul className="award-records">{awards.slice(3).map(a=><AwardRow key={a.award_id} award={a}/>)}</ul></details>}</>;
 }
 export default function Awards({openTitle}:{openTitle:(id:number)=>void}) {
-  const [q,setQ]=useState(''),[type,setType]=useState('all'),[name,setName]=useState(''),[year,setYear]=useState('');
-  const [offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[data,setData]=useState<Result|null>(null);
+const [q,setQ]=usePageState('awards-query', ''),[type,setType]=usePageState('awards-type', 'all'),[name,setName]=usePageState('awards-name', ''),[year,setYear]=usePageState('awards-year', '');
+const [offset,setOffset]=usePageState('awards-offset', 0),[retry,setRetry]=useState(0),[data,setData]=useState<Result|null>(null);
   const [loading,setLoading]=useState(true),[error,setError]=useState('');
   useEffect(()=>{
     const controller=new AbortController();

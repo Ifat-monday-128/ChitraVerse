@@ -3,11 +3,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, posterUrl, type Media, type User } from './api';
 import ThemePicker from './theme-picker';
+import Moderation from './moderation';
+import { usePageState, navigateHome } from './page-state';
 import './account-profile.css';
 
 type Profile = { user: User; counts: { favorites: number; playlists: number; ratings: number; stories: number }; favorites: Media[]; playlists: { watchlist_id: number; name: string; title_count: number }[] };
 type Activity = { kind: string; id: string; title: string; title_id: number | null; detail: string | null; occurred_at: string };
-type Tab = 'Overview' | 'My account' | 'Activity' | 'Security';
+type Tab = 'Overview' | 'My account' | 'Activity' | 'Security' | 'Reports';
 export type AccountProfileProps = {
   user: User; updated: (user: User) => void; logout: () => void; busy: boolean; error: string;
   favorites: () => void; watchlists: () => void; openTitle: (id: number) => void; openList: (id: number) => void;
@@ -36,7 +38,7 @@ async function preparePhoto(file: File): Promise<string> {
 
 export default function AccountProfile(props: AccountProfileProps) {
   const [sidebarOpen,setSidebarOpen]=useState(false);
-  const [tab, setTab] = useState<Tab>('Overview');
+const [tab, setTab] = usePageState<Tab>(`account-tab:${props.user.user_id}`, 'Overview');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState(props.user.name);
   const [avatar, setAvatar] = useState<string | null>(props.user.avatar || null);
@@ -89,10 +91,11 @@ export default function AccountProfile(props: AccountProfileProps) {
   return <section className="account-hub" aria-label="Account dashboard">
     <button className="sidebar-toggle secondary-button" aria-expanded={sidebarOpen} onClick={()=>setSidebarOpen(!sidebarOpen)}>Menu: Account navigation</button>
     <aside className={`account-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
-      <div className="account-brand">CHITRA<span>VERSE</span><small>YOUR PERSONAL SPACE</small></div>
+      <a className="account-brand" href="/" onClick={navigateHome} aria-label="ChitraVerse homepage">CHITRA<span>VERSE</span><small>YOUR PERSONAL SPACE</small></a>
       <div className="account-sidebar-person">{portrait(displayedUser.avatar)}<strong>{displayedUser.name}</strong><span className="account-role">{admin ? 'Administrator' : props.user.role === 'moderator' ? 'Moderator' : 'Cinema lover'}</span></div>
       <nav aria-label="Account sections">{(['Overview', 'My account', 'Activity', 'Security'] as Tab[]).map((item, index) => <button type="button" key={item} className={tab === item ? 'active' : ''} aria-current={tab === item ? 'page' : undefined} onClick={() => navigate(item)}><span aria-hidden="true">{['◫', '◎', '◷', '◇'][index]}</span>{item}<b aria-hidden="true">›</b></button>)}
         {!admin && <><p>YOUR LIBRARY</p><button onClick={props.favorites}><span aria-hidden="true">♡</span>Favorites<b aria-hidden="true">›</b></button><button onClick={props.watchlists}><span aria-hidden="true">▤</span>Playlists<b aria-hidden="true">›</b></button></>}
+        {props.user.role === 'moderator' && <button type="button" className={tab === 'Reports' ? 'active' : ''} aria-current={tab === 'Reports' ? 'page' : undefined} onClick={() => { navigate('Reports'); setSidebarOpen(false); }}><span aria-hidden="true">⚑</span>Reports<b aria-hidden="true">›</b></button>}
       </nav>
       <ThemePicker />
       <button className="account-signout" onClick={props.logout} disabled={props.busy || saving}>{props.busy ? 'Signing out…' : 'Sign out'}<span aria-hidden="true">↗</span></button>
@@ -117,6 +120,7 @@ export default function AccountProfile(props: AccountProfileProps) {
       {tab === 'Security' && <form className="account-settings" onSubmit={changePassword}><h2>Change password</h2><p>Use a unique password with at least 8 characters.</p><label className="account-field">Current password<input name="current_password" type="password" required maxLength={128} autoComplete="current-password" disabled={saving} /></label><label className="account-field">New password<input name="new_password" type="password" required minLength={8} maxLength={128} autoComplete="new-password" disabled={saving} /></label><label className="account-field">Confirm new password<input name="confirm_password" type="password" required minLength={8} maxLength={128} autoComplete="new-password" disabled={saving} /></label><div className="account-security-note"><span aria-hidden="true">◇</span><p>Changing your password signs out your other sessions. You will stay signed in here.</p></div><button className="primary-button" disabled={saving}>{saving ? 'Updating…' : 'Update password'}</button></form>}
       {tab === 'Activity' && <section className="account-settings account-activity"><div className="account-section-heading"><h2>Activity log</h2><span>Most recent first</span></div>{activityError && <p className="account-notice error" role="alert">{activityError}<button className="text-button" onClick={() => setRetry(n => n + 1)}>Try again</button></p>}<ol>{activities.map(item => <li key={`${item.kind}-${item.id}`}><span className={`account-activity-icon ${item.kind}`} aria-hidden="true">{{ rating: '★', favorite: '♡', playlist: '▤', comment: '“', story: '✎' }[item.kind]}</span><div><small>{{ rating: 'Rating activity', favorite: 'Added to favorites', playlist: 'Saved to a playlist', comment: 'Joined the conversation', story: 'Published a story' }[item.kind]}</small>{item.title_id ? <button className="account-activity-title" onClick={() => props.openTitle(item.title_id!)}>{item.title}</button> : <strong>{item.title}</strong>}{item.detail && <p>{item.detail}</p>}</div><time dateTime={item.occurred_at}>{dateLabel(item.occurred_at)}</time></li>)}</ol>{activityLoading && <p role="status">Loading activity…</p>}{!activityLoading && !activityError && !activities.length && <div className="account-empty"><span aria-hidden="true">◷</span><h3>Your journey is just beginning.</h3><p>Rate a movie, save a favorite, or share a story to see it here.</p></div>}{hasMore && <button className="secondary-button" disabled={activityLoading} onClick={moreActivity}>Load more activity</button>}</section>}
       </>}
+      {tab === 'Reports' && props.user.role === 'moderator' && <Moderation user={props.user} />}
     </div>
   </section>;
 }

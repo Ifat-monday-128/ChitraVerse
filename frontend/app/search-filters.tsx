@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api';
 import AnimatedDisclosure from './animated-disclosure';
 import Select from './custom-select';
+import { usePageState } from './page-state';
 
 export const emptyFilters = { type:'all', genre:'', language:'', country:'', year_from:'', year_to:'', rating_min:'', rating_max:'', runtime_min:'', runtime_max:'', trailer:'', sort:'relevance' };
 export type TitleFilters = typeof emptyFilters;
@@ -26,7 +27,7 @@ function useFacets() {
 function displayName(code:string,type:'language'|'region') { try { return new Intl.DisplayNames(['en'],{type}).of(code) || code; } catch { return code; } }
 
 export function TitleFilterPanel({ value: applied, change, defaultSort = 'relevance' }: { value:TitleFilters; change:(value:TitleFilters)=>void; defaultSort?: string }) {
-  const [value,setValue] = useState(applied);
+const [value,setValue] = usePageState('title-filter-draft:' + JSON.stringify(applied), applied);
   const {data,error,retry}=useFacets();
   const update = (key:keyof TitleFilters, next:string) => setValue({...value,[key]:next});
   const active = Object.keys(filterParams(applied)).length;
@@ -43,7 +44,7 @@ export function TitleFilterPanel({ value: applied, change, defaultSort = 'releva
 
 export const emptyPeopleFilters = { role:'',photo:'',born_from:'',born_to:'',sort:'name_asc' };
 export function PeopleFilterPanel({value:applied,change}:{value:typeof emptyPeopleFilters;change:(value:typeof emptyPeopleFilters)=>void}) {
-  const [value,setValue]=useState(applied);
+const [value,setValue]=usePageState('people-filter-draft:' + JSON.stringify(applied), applied);
   const {data,error,retry}=useFacets();
   const update=(key:keyof typeof value,next:string)=>setValue({...value,[key]:next});
   return <AnimatedDisclosure label="Cast filters & sorting"><div className="filter-grid"><label>Role<Select value={value.role} onChange={event=>update('role',event.target.value)}><option value="">All cast &amp; crew</option>{data?.roles.map(role=><option key={role.role_id} value={role.role_id}>{role.role_name}</option>)}</Select></label><label>Profile photo<Select value={value.photo} onChange={event=>update('photo',event.target.value)}><option value="">All profiles</option><option value="yes">With photo</option><option value="no">Without photo</option></Select></label><label>Born from<input type="number" min="1800" max="2200" placeholder="Year" value={value.born_from} onChange={event=>update('born_from',event.target.value)} /></label><label>Born through<input type="number" min="1800" max="2200" placeholder="Year" value={value.born_to} onChange={event=>update('born_to',event.target.value)} /></label><label>Sort by<Select value={value.sort} onChange={event=>update('sort',event.target.value)}><option value="name_asc">Name: A–Z</option><option value="name_desc">Name: Z–A</option><option value="birth_asc">Birth date: oldest first</option><option value="birth_desc">Birth date: newest first</option></Select></label></div>{error && <p role="alert">Role options could not load. <button type="button" onClick={retry}>Retry</button></p>}<div className="filter-actions"><button type="button" className="primary-button" onClick={()=>change(value)}>Apply filters</button><button type="button" className="text-button" onClick={()=>{setValue({...emptyPeopleFilters});change({...emptyPeopleFilters});}}>Reset filters</button></div></AnimatedDisclosure>;

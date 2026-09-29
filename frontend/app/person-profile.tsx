@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePageState } from "./page-state";
 import { api, posterUrl, type Person } from "./api";
 import AnimatedDisclosure from './animated-disclosure';
 import Select from './custom-select';
@@ -20,8 +21,8 @@ export default function PersonProfile({ id, openTitle }: { id: number; openTitle
   const [person, setPerson] = useState<Person | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [filter, setFilter] = useState("all");
-  const [filmFilters,setFilmFilters]=useState({q:'',year_from:'',year_to:'',rating_min:'',sort:'newest',role:''});
+const [filter, setFilter] = usePageState("film-type", "all");
+const [filmFilters,setFilmFilters]=usePageState('film-filters', {q:'',year_from:'',year_to:'',rating_min:'',sort:'newest',role:''});
   useEffect(() => {
     const controller = new AbortController();
     api<Person>(`/api/media/people/${id}`, { signal: controller.signal }).then(setPerson).catch(() => {

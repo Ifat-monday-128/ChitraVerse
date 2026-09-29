@@ -139,9 +139,9 @@
   letter-spacing: 0.5px;
 }
 .admin-user-role.admin {
-  background: rgba(229, 9, 20, 0.1);
+  background: color-mix(in srgb, var(--accent) 0.1, transparent);
   color: var(--accent);
-  border: 1px solid rgba(229, 9, 20, 0.2);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .admin-user-role.user {
   background: rgba(121, 115, 73, 0.1);
@@ -247,4 +247,16 @@
 .admin-stat-badge strong {
   color: #fff;
   font-weight: 600;
+}
+
+.admin-users-directory .admin-user-avatar {
+  width: 54px;
+  height: 54px;
+  border: 1px solid color-mix(in srgb, var(--accent-light) 68%, #ffffff22);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 42%, #292b25), #10120f 76%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  text-shadow: 0 1px 4px #000b;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent), 0 6px 18px #0009, inset 0 1px 0 #ffffff35;
 }

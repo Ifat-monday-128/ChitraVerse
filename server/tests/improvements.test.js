@@ -56,8 +56,7 @@ test('reports, notifications, staff permissions, suspension and recoverable dele
  assert.equal((await request('/api/account/login',null,{email:'user@example.invalid',password})).status,403);
  assert.equal((await request(url,'admin',{action:'unsuspend',reason:'Appeal accepted'},'PATCH')).status,200);
  assert.equal((await request('/api/account/watchlists','user')).status,200);
- assert.equal((await request(url,'admin',{action:'delete',reason:'Confirmed violation',confirmation:'wrong'},'PATCH')).status,400);
- assert.equal((await request(url,'admin',{action:'delete',reason:'Confirmed violation',confirmation:'A community story'},'PATCH')).status,200);
+ assert.equal((await request(url,'admin',{action:'delete',reason:'Confirmed violation'},'PATCH')).status,200);
  assert.ok((await pool.query('SELECT deleted_at,content FROM community_post WHERE post_id=$1',[id])).rows[0].deleted_at);
  assert.equal((await request(`/api/media/community/${id}/comments`)).status,404);
  const queue=await request(`/api/account/moderation/reports?report_id=${rid}`,'admin');assert.equal(queue.data.items[0].status,'Resolved');assert.ok(queue.data.items[0].history.length>=5);

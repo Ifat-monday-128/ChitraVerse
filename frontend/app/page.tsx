@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { clearPageState, saveScroll, restoreScroll, usePageState } from './page-state';
 import Link from "next/link";
 import Dialog from "./dialog";
 import { LibraryProvider } from "./library-state";
@@ -66,14 +67,24 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const resultCache = useRef(new Map<string, { items: Media[]; total: number; hasMore: boolean; hero: Media | null; featuredItems: Media[] }>());
+  const loadedKey = useRef('');
   const [moderation, setModeration] = useState(false);
   const [unreadReports, setUnreadReports] = useState(0);
 
   const [menu, setMenu] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [account, setAccount] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [register, setRegister] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const resultKey = JSON.stringify([route, retry, user?.user_id]);
+  useEffect(() => { clearPageState(); resultCache.current.clear(); }, [user?.user_id]);
+  useEffect(() => {
+    if (!loading && !error && loadedKey.current === resultKey) {
+      resultCache.current.set(resultKey, { items, total, hasMore, hero, featuredItems });
+    }
+  }, [resultKey, loading, error, items, total, hasMore, hero, featuredItems]);
   useEffect(() => { if(user?.role !== 'admin') return; const refresh = () => api<{unread:number}>('/api/account/moderation/notifications').then(d=>setUnreadReports(d.unread)).catch(()=>{}); refresh(); const timer=setInterval(refresh,30000); window.addEventListener('chitraverse:reports-changed',refresh); return()=>{clearInterval(timer);window.removeEventListener('chitraverse:reports-changed',refresh);}; }, [user]);
   const [accountError, setAccountError] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
@@ -84,7 +95,7 @@ export default function Home() {
   const [trailerTitleId, setTrailerTitleId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Media | null>(null);
   const [detailError, setDetailError] = useState("");
-  const [season, setSeason] = useState("");
+  const [season, setSeason] = usePageState('selected-season', '');
   const [episodes, setEpisodes] = useState<{ ep_id: number; title: string; episode_number: number }[]>([]);
   const [episodeError, setEpisodeError] = useState("");
   const [episodesLoading, setEpisodesLoading] = useState(false);
@@ -97,10 +108,11 @@ export default function Home() {
     setRoute(current => ({ ...current, q }));
     const params = new URLSearchParams(window.location.search);
     if (q) params.set('q', q); else params.delete('q');
-    window.history.replaceState(null, '', `/?${params}`);
+    window.history.replaceState(window.history.state, '', `/?${params}`);
   }
 
   function openTitle(id: number) {
+    saveScroll();
     setHeroHovered(false); setHeroFocused(false);
     const params = new URLSearchParams(window.location.search);
     params.delete('external'); setExternalTitle(null);
@@ -109,6 +121,7 @@ export default function Home() {
     setDetailId(id); window.scrollTo({ top: 0 });
   }
   function openPerson(id: number) {
+    saveScroll();
     const params = new URLSearchParams(window.location.search);
     params.delete('external'); setExternalTitle(null);
     params.delete("title"); params.delete("company"); params.set("person", String(id));
@@ -116,6 +129,7 @@ export default function Home() {
     setDetailId(null); setCompanyId(null); setPersonId(id); window.scrollTo({ top: 0 });
   }
   function openCompany(id: number) {
+    saveScroll();
     const params = new URLSearchParams(window.location.search);
     params.delete('external'); setExternalTitle(null);
     params.delete("title"); params.delete("person"); params.set("company", String(id));
@@ -127,7 +141,8 @@ export default function Home() {
     else go();
   }
   function go(next: Partial<Route> = {}) {
-    setHeroHovered(false); setHeroFocused(false);
+    saveScroll();
+    setHeroHovered(false); setHeroFocused(false); setProfileMenuOpen(false);
     const value = { ...home, sort: next.view === 'browse' ? 'random' : home.sort, ...next };
     value.seed = value.sort === 'random' ? value.seed || newShuffleSeed() : '';
     const query = new URLSearchParams();
@@ -139,11 +154,14 @@ export default function Home() {
     for (const [key,filterValue] of Object.entries(filterParams(value))) query.set(key,filterValue);
     if (value.view === 'browse') query.set('sort', value.sort);
     if (value.seed) query.set('seed', value.seed);
-    window.history.pushState(null, "", query.size ? `/?${query}` : "/");
+    window.history.pushState({ cv: true }, "", query.size ? `/?${query}` : "/");
     setExternalTitle(null);
     setRoute(value); setDetailId(null); setPersonId(null); setCompanyId(null); setMenu(false); setError(""); window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }
   useEffect(() => {
+    const previousRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    let cancelRestore = () => {};
     function read() {
       const params = new URLSearchParams(window.location.search), view = params.get("view");
       const sort = params.get('sort') || (view === 'browse' ? 'random' : emptyFilters.sort);
@@ -165,9 +183,12 @@ export default function Home() {
       });
       setReady(true);
     }
-    read(); window.addEventListener("popstate", read);
+    const onBack = () => { cancelRestore(); read(); setMenu(false); setProfileMenuOpen(false); cancelRestore = restoreScroll(); };
+    const rememberScroll = () => saveScroll();
+    read(); window.addEventListener("popstate", onBack);
+    window.addEventListener('scroll', rememberScroll, { passive: true, capture: true });
     api<{ user: User | null }>("/api/account/me").then((data) => setUser(data.user)).catch(() => { });
-    return () => window.removeEventListener("popstate", read);
+    return () => { window.removeEventListener("popstate", onBack); window.removeEventListener('scroll', rememberScroll, true); cancelRestore(); window.history.scrollRestoration = previousRestoration; };
   }, []);
   useEffect(() => {
     const expired = () => {
@@ -187,8 +208,16 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (!ready || ["awards", "cast", "watchlist", "favorites", "community", "dashboard"].includes(route.view)) return;
+    const cached = resultCache.current.get(resultKey);
+    if (cached) {
+      loadedKey.current = resultKey;
+      setItems(cached.items); setTotal(cached.total); setHasMore(cached.hasMore);
+      setHero(cached.hero); setFeaturedItems(cached.featuredItems); setError(''); setLoading(false); setLoadingMore(false);
+      return;
+    }
+    loadedKey.current = '';
     const controller = new AbortController();
-    // Reset data when synchronizing with a new API request, including browser Back.
+    // Only unseen routes and explicit retries start from the first result batch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true); setError(""); setHero(null); setItems([]); setHasMore(false); setLoadingMore(false);
     const timer = setTimeout(async () => {
@@ -201,19 +230,19 @@ export default function Home() {
           if (!controller.signal.aborted) { setItems(data.items); setTotal(data.total); setHasMore(data.hasMore); }
         }
       } catch (error) { if (!controller.signal.aborted) setError(message(error)); }
-      finally { if (!controller.signal.aborted) setLoading(false); }
+      finally { if (!controller.signal.aborted) { loadedKey.current = resultKey; setLoading(false); } }
     }, route.view === "search" ? 250 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [route, retry, ready, user]);
   useEffect(() => {
     // Discard data belonging to the previously requested title.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDetail(null); setDetailError(""); setSeason(""); setEpisodes([]);
+    setDetail(null); setDetailError(""); setEpisodes([]);
     if (detailId === null) setTrailerTitleId(null);
     if (detailId === null) return;
     const controller = new AbortController();
     api<Media>(`/api/media/${detailId}`, { signal: controller.signal }).then((data) => {
-      if (!controller.signal.aborted) { setDetail(data); setSeason(data.seasons?.[0] ? String(data.seasons[0].season_number) : ""); }
+      if (!controller.signal.aborted) { setDetail(data); setSeason(current => data.seasons?.some(item => String(item.season_number) === current) ? current : data.seasons?.[0] ? String(data.seasons[0].season_number) : ''); }
     }).catch((error) => { if (!controller.signal.aborted) setDetailError(message(error)); });
     return () => controller.abort();
   }, [detailId, user]);
@@ -256,7 +285,7 @@ export default function Home() {
     try {
       // Wait for the server to delete the session before clearing the UI.
       await api("/api/account/logout", { method: "POST" });
-      setUser(null); setModeration(false);
+      setUser(null); setModeration(false); setProfileMenuOpen(false);
       if (typeof BroadcastChannel !== "undefined") { const channel = new BroadcastChannel("chitraverse-account"); channel.postMessage("changed"); channel.close(); }
       setAdminOpen(false);
       setAccount(false);
@@ -284,11 +313,24 @@ export default function Home() {
         <button className="icon-button menu" aria-label="Open menu" aria-expanded={menu} aria-controls="navigation-drawer" aria-haspopup="dialog" onClick={() => setMenu(true)}><i /><i /><i /></button>
         <HeaderSearch active={isDirectory && route.view === 'search'} query={route.q}
           open={() => go({ view: 'search' })} close={() => go()} change={changeSearch} submit={() => setRetry(current => current + 1)} /></div>
-        <Link className="brand" href="/" aria-label="ChitraVerse home" onClick={(event) => { event.preventDefault(); go(); }} style={{ display: 'flex', alignItems: 'center' }}>
+        <Link className="brand" href="/" aria-label="ChitraVerse home" onClick={(event) => { event.preventDefault(); go(); }}>
           {isHome && <img src="/icon.svg" alt="ChitraVerse Logo" style={{ width: 32, height: 32, marginRight: 10, borderRadius: 8 }} />}
           <BrandWordmark />
         </Link>
-        <button className="avatar" aria-label="Open profile" onClick={() => { setAccount(true); setAccountError(""); }}>{user?.avatar ? <img src={user.avatar} alt="Your profile" /> : user ? user.name.slice(0, 2).toUpperCase() : "CV"}</button>
+        <div className={`avatar-menu-wrapper${profileMenuOpen ? ' is-open' : ''}`} onMouseEnter={() => { if (user) setProfileMenuOpen(true); }} onMouseLeave={event => { if (!event.currentTarget.contains(document.activeElement)) setProfileMenuOpen(false); }} onFocusCapture={() => { if (user) setProfileMenuOpen(true); }} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setProfileMenuOpen(false); }}>
+          <button className="avatar" aria-label={user ? 'Open profile menu' : 'Open profile'} aria-expanded={user ? profileMenuOpen : undefined} aria-controls={user ? 'avatar-profile-dropdown' : undefined} onClick={() => { if (user) setProfileMenuOpen(true); else { setAccount(true); setAccountError(''); } }}>{user?.avatar ? <img src={user.avatar} alt="Your profile" /> : user ? user.name.slice(0, 2).toUpperCase() : "CV"}</button>
+          {user && <div className="avatar-dropdown" id="avatar-profile-dropdown" role="group" aria-label="Profile actions">
+            <button type="button" className="avatar-dropdown-btn" onClick={() => go({ view: 'dashboard' })}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.2 3.1-5 7-5s6.2 1.8 7 5"/></svg>
+              <span>View profile</span>
+            </button>
+            <button type="button" className="avatar-dropdown-btn avatar-dropdown-signout" disabled={accountBusy} onClick={() => { setAccountError(''); void logout(); }}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>
+              <span>{accountBusy ? 'Signing out…' : 'Sign out'}</span>
+            </button>
+            {accountError && <p className="avatar-dropdown-error" role="alert">{accountError}</p>}
+          </div>}
+        </div>
       </header>
       {isHome && <div className="hero-copy" key={hero?.title_id ?? 'loading'}>{loading ? <p role="status">Loading your movie library…</p> : hero ? <>
         <p className="eyebrow">{hero.genres?.map((genre) => genre.name).join(" · ")}</p><h1>{hero.title}</h1>
@@ -297,7 +339,6 @@ export default function Home() {
           {!!hero.runtime && <span>{Math.floor(hero.runtime / 60)}h {hero.runtime % 60}m</span>}</div>
         <div className="hero-actions" onMouseEnter={() => setHeroHovered(true)} onMouseLeave={() => setHeroHovered(false)}>{heroTrailer ? <button className="play-button" onClick={() => { setTrailerTitleId(hero.title_id); openTitle(hero.title_id); }}><span className="play-icon" /> TRAILER</button> : <span className="unavailable">Trailer unavailable</span>}
           <button className="about-button" onClick={() => openTitle(hero.title_id)}>ABOUT <span className="about-chevron" aria-hidden="true" /></button></div>
-        {user?.role === 'admin' && <button className="text-button" onClick={() => setHomepageEditor(true)}>Edit homepage features</button>}
       </> : <><p className="eyebrow"><BrandWordmark /></p><h1>{error ? "Library unavailable" : "No movies yet"}</h1>
         <p className="description">{error || "No Hollywood movies are available in the library yet."}</p><button className="primary-button" onClick={() => setRetry((current) => current + 1)}>Try again</button></>}
       </div>}

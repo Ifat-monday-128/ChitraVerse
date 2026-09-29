@@ -1,6 +1,7 @@
 "use client";
 import Image from 'next/image';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { usePageState } from './page-state';
 import Dialog from './dialog';
 import { api, ApiError, type User } from './api';
 import './community.css';
@@ -31,12 +32,20 @@ export default function Community({user,signIn,sessionExpired,openTitle,openPers
   const [success,setSuccess]=useState(''); const [loadingMore,setLoadingMore]=useState(false);
   const [busy,setBusy]=useState(false); const [loading,setLoading]=useState(true);
   const [hasMore,setHasMore]=useState(false); const [retry,setRetry]=useState(0);
-  const [offset,setOffset]=useState(0);
+  const [offset,setOffset]=usePageState('community-loaded-count', 0);
   const trigger=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
     const controller=new AbortController();
     const timer=setTimeout(()=>{setLoading(true); setError('');},0);
-    api<{posts:Post[];hasMore:boolean}>('/api/media/community',{signal:controller.signal})
+    (async () => {
+      const accumulated: Post[] = [];
+      let more = true;
+      do {
+        const batch = await api<{posts:Post[];hasMore:boolean}>(`/api/media/community?offset=${accumulated.length}`, {signal:controller.signal});
+        accumulated.push(...batch.posts); more = batch.hasMore && batch.posts.length > 0;
+      } while (more && accumulated.length < offset);
+      return {posts: accumulated, hasMore: more};
+    })()
       .then(d=>{if(!controller.signal.aborted){setPosts(d.posts);setOffset(d.posts.length);setHasMore(d.hasMore);}})
       .catch(e=>{if(!controller.signal.aborted)setError(errorText(e));})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});

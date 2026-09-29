@@ -3,7 +3,46 @@
 .drawer-navigation{min-height:0}.drawer-header,.drawer-footer{flex-shrink:0}.drawer-footer{flex-direction:column;align-items:stretch;padding:16px 24px}.drawer-signout{text-align:left;justify-content:flex-start}
 .dashboard-shell .admin-sidebar,.dashboard-shell .account-sidebar{position:sticky;top:0;height:100dvh;min-height:0;overflow:hidden;gap:16px;padding:20px 16px;align-self:start}
 .dashboard-shell .admin-sidebar nav,.dashboard-shell .account-sidebar nav{flex:1;min-height:0;overflow:auto;align-content:start;overscroll-behavior:contain}
+/* Hide navigation scrollbar chrome while retaining wheel, touch and keyboard scrolling. */
+.dashboard-shell .admin-sidebar nav,
+.dashboard-shell .account-sidebar nav{scrollbar-width:none}
+.dashboard-shell .admin-sidebar nav::-webkit-scrollbar,
+.dashboard-shell .account-sidebar nav::-webkit-scrollbar{display:none}
 .dashboard-shell .admin-logout,.dashboard-shell .account-signout{position:static;margin-top:0;flex-shrink:0;padding:12px 14px;right:auto;text-align:left}
 .dashboard-shell .admin-back-home{margin-top:0;flex-shrink:0}.dashboard-shell .admin-main{overflow:auto}.dashboard-shell .account-sidebar-person{padding:8px 0}.sidebar-toggle{display:none}
+/* Keep desktop navigation stationary; only the content column scrolls.
+   The sidebar itself must not clip the custom colour popover. */
+@media(min-width:761px){
+  .home-shell.dashboard-shell:has(.account-hub,.admin-workspace){
+    height:100dvh!important;
+    min-height:0;
+    overflow:hidden!important;
+  }
+  .home-shell.dashboard-shell .account-hub,
+  .home-shell.dashboard-shell .admin-workspace{
+    height:100%;
+    min-height:0;
+    max-width:none;
+    margin:0;
+    border:0;
+    border-radius:0;
+    grid-template-rows:minmax(0,1fr);
+  }
+  .home-shell.dashboard-shell .account-sidebar,
+  .home-shell.dashboard-shell .admin-sidebar{
+    position:relative;
+    height:100%;
+    box-sizing:border-box;
+    overflow:visible;
+  }
+  .home-shell.dashboard-shell .account-main,
+  .home-shell.dashboard-shell .admin-main{
+    display:block;
+    height:100%;
+    min-height:0;
+    overflow:auto;
+    overscroll-behavior:contain;
+  }
+}
 @media(max-height:600px){.dashboard-shell .admin-identity,.dashboard-shell .account-sidebar-person{display:none}.drawer-header{min-height:64px;padding:12px 24px}}
 @media(max-width:760px){.sidebar-toggle{display:block;margin:12px}.dashboard-shell .account-hub,.dashboard-shell .admin-workspace{display:block;margin:0;border-radius:0}.dashboard-shell .admin-sidebar,.dashboard-shell .account-sidebar{display:none;position:fixed;left:0;top:55px;bottom:0;height:calc(100dvh - 55px);width:min(300px,85vw);z-index:25;background:#171a1d;box-shadow:20px 0 60px #0009}.dashboard-shell .sidebar-open{display:flex}.dashboard-shell .admin-sidebar nav,.dashboard-shell .account-sidebar nav{display:grid;overflow-y:auto;overflow-x:hidden}.dashboard-shell .admin-sidebar nav button{flex-shrink:1}.dashboard-shell .admin-main,.dashboard-shell .account-main{padding:20px 16px}.dashboard-shell .admin-heading{margin-top:0}}

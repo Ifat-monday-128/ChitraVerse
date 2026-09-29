@@ -63,7 +63,7 @@ export function AdminUsers() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [retry]);
-  return <section className="admin-users-container" aria-label="Users and activity">
+  return <section className="admin-users-container admin-users-directory" aria-label="Users and activity">
     <div className="admin-users-header">
       <div className="admin-users-title-area">
         <h2>Users &amp; Activity</h2>

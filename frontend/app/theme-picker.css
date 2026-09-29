@@ -44,6 +44,13 @@
   position: relative;
 }
 
+/* Raise the sidebar's stacking context, not just the picker inside it.
+   Its backdrop blur otherwise keeps the palette behind adjacent posters. */
+.account-sidebar:has(.color-popover),
+.admin-sidebar:has(.color-popover) {
+  z-index: 10;
+}
+
 .custom-picker {
   display: flex;
   align-items: center;

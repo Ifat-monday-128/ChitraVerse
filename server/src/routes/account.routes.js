@@ -36,7 +36,9 @@ async function currentUser(req) {
   if (!token) return null;
   const claims = verifyJwt(token);
   if (!claims) return null;
-  const { rows } = await pool.query(queries.findSessionUser, [hashToken(token), Number(claims.sub)]);
+  const userId = Number(claims.sub);
+  if (!Number.isSafeInteger(userId) || userId < 1 || userId > 2147483647) return null;
+  const { rows } = await pool.query(queries.findSessionUser, [hashToken(token), userId]);
   return rows[0] || null;
 }
 

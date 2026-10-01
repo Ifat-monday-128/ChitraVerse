@@ -7,6 +7,7 @@ const { promisify } = require("node:util");
 const { randomBytes, scryptSync, createHash } = require("node:crypto");
 require("../src/config/env");
 const { Pool } = require("pg");
+const { createJwt } = require("../src/utils/jwt");
 
 // All fixture accounts live in a disposable schema, never in the real users table.
 const schema = `chitraverse_auth_${process.pid}_${Date.now()}`;
@@ -142,6 +143,12 @@ test("switching accounts revokes the previous session; expired and invalid sessi
     assert.equal((await request("/api/account/watchlist", { cookie })).status, 401);
     assert.equal((await request("/api/account/me", { cookie })).status, 401);
   }
+});
+
+test("JWT subjects outside the database user ID range are rejected without a server error", async () => {
+  const token = createJwt(2147483648).token;
+  const result = await request("/api/account/me", { cookie: `chitraverse_session=${token}` });
+  assert.equal(result.status, 401);
 });
 
 test("registration hashes passwords and ignores a client-supplied privileged role", async () => {

@@ -57,6 +57,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 }
 export function posterUrl(poster: string | null, size = "w500") {
   if (!poster) return undefined;
+  if (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(poster)) return poster;
   if (/^\/[A-Za-z0-9_.-]+\.(jpg|jpeg|png|webp)$/i.test(poster)) return `https://image.tmdb.org/t/p/${size}${poster}`;
   if (/^https:\/\//i.test(poster)) return poster;
   return undefined;

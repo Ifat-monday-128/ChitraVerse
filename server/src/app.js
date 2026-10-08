@@ -9,7 +9,9 @@ const app = express();
 const defaultOrigins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001";
 const origins = (process.env.FRONTEND_ORIGINS || defaultOrigins).split(",").map((value) => value.trim());
 app.use(cors({ origin: origins, credentials: true }));
-app.use(express.json({ limit: "64kb" }));
+// Catalog editors may include several small, browser-optimized cast photos.
+// The metadata service applies a much smaller per-image limit.
+app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.headers.origin && !origins.includes(req.headers.origin)) {
     return res.status(403).json({ error: "Origin is not allowed" });

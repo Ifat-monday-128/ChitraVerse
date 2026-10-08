@@ -94,7 +94,8 @@ account.patch('/moderation/reports/:reportId',wrap(async(req,res)=>{
  const reportId=id(req.params.reportId),action=req.body?.action,why=reason(req.body?.reason);
  if(!['review','hide','unhide','dismiss','escalate','resolve','delete','suspend','unsuspend'].includes(action))throw fail(400,'Invalid moderation action.');
  await pool.withTransaction(async db=>{
- await activeActor(db,req.user,['delete','suspend','unsuspend'].includes(action));
+ const actor=await activeActor(db,req.user,['delete','suspend','unsuspend'].includes(action));
+ if(action==='escalate'&&actor.role!=='moderator')throw fail(403,'Only moderators can escalate reports to Admin.');
  const {rows:[report]}=await db.query('SELECT * FROM community_report WHERE report_id=$1 FOR UPDATE',[reportId]);if(!report)throw fail(404,'Report unavailable.');
  const {rows:[post]}=await db.query('SELECT * FROM community_post WHERE post_id=$1 FOR UPDATE',[report.post_id]);
  if(['hide','unhide','delete','suspend','unsuspend'].includes(action)&&!post)throw fail(409,'The story has already been removed. You can resolve or dismiss this report.');

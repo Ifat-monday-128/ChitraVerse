@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: chitraverse-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: DB_SSL
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TMDB_TOKEN
+        sync: false
+      - key: TMDB_WATCH_REGION
+        value: BD
+      - key: FRONTEND_ORIGINS
+        sync: false

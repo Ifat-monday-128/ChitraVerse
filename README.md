@@ -2,6 +2,8 @@
 
 For the implemented project features, TMDB-link imports, and Gmail OTP setup, see [Features and setup guide](information/FEATURES_AND_SETUP.md). Catalog browsing is public; account features and admin operations require sign-in.
 
+For production deployment with Supabase PostgreSQL and separate Vercel API and frontend projects, see [the deployment guide](DEPLOYMENT.md).
+
 Core account, profile, library, and catalog SQL stays in [`server/src/queries`](server/src/queries/README.md), along with shared SQL helpers. Feature-specific queries live beside their owning routes, services, or scripts. Schema definitions and migrations remain in `server/database`.
 
 ChitraVerse is a movie and TV series discovery application built with React, an Express API, and PostgreSQL. TMDB supplies catalog metadata; a separate web-search workflow discovers YouTube trailers. Users can browse titles, search by title or actor, inspect details and episodes, and maintain a private watchlist.

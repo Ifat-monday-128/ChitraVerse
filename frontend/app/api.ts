@@ -25,9 +25,15 @@ export const sessionExpiredEvent = "chitraverse:session-expired";
 
 function apiBase() {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  // Keep local frontend and API requests on the same hostname. Mixing
-  // localhost and 127.0.0.1 makes browsers treat the session as cross-site.
-  if (typeof window !== "undefined") return `${window.location.protocol}//${window.location.hostname}:5000`;
+  if (typeof window !== "undefined") {
+    // Local development uses the standalone Express port. Production stays
+    // same-origin and lets Next/Vercel proxy /api to the deployed backend, so
+    // the HttpOnly authentication cookie is first-party.
+    if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+      return `${window.location.protocol}//${window.location.hostname}:5000`;
+    }
+    return window.location.origin;
+  }
   return "http://localhost:5000";
 }
 

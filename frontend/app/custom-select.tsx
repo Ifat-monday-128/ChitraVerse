@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useState, useRef, useEffect, Children, isValidElement } from 'react';
+import { ReactNode, useState, useRef, useEffect, Children, isValidElement, type OptionHTMLAttributes } from 'react';
 import './custom-select.css';
 
 export default function Select(props: {
@@ -24,7 +24,7 @@ export default function Select(props: {
 
   const options: { value: string; label: ReactNode }[] = [];
   Children.forEach(props.children, child => {
-    if (isValidElement(child) && child.type === 'option') {
+    if (isValidElement<OptionHTMLAttributes<HTMLOptionElement>>(child) && child.type === 'option') {
       const val = child.props.value !== undefined ? String(child.props.value) : String(child.props.children);
       options.push({ value: val, label: child.props.children });
     }

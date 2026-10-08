@@ -45,6 +45,7 @@ test('reports, notifications, staff permissions, suspension and recoverable dele
  const n=await request('/api/account/moderation/notifications','admin');const note=n.data.items.find(n=>n.report_id===rid);assert.ok(note);assert.ok(n.data.unread>0);
  assert.equal((await request('/api/account/moderation/reports','user')).status,403);
  for(const action of ['delete','suspend','unsuspend'])assert.equal((await request(url,'moderator',{action,reason:'Forbidden',confirmation:'A community story'},'PATCH')).status,403);
+ assert.equal((await request(url,'admin',{action:'escalate',reason:'Admins cannot escalate to themselves'},'PATCH')).status,403);
  assert.equal((await request(`/api/account/admin/accounts/${ids.user}`,'moderator',{role:'admin'},'PATCH')).status,403);
  for(const action of ['review','escalate'])assert.equal((await request(url,'moderator',{action,reason:'Needs review'},'PATCH')).status,200);
  assert.equal((await request(`/api/account/moderation/reports?report_id=${rid}`,'admin')).data.items[0].status,'Escalated');

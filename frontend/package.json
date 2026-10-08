@@ -6,11 +6,11 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev --config vite.config.ts",
-    "build": "vinext build --config vite.config.ts",
-    "start": "vinext start --config vite.config.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "test": "npm run build && npm run typecheck && node --test tests/*.test.mjs",
-    "typecheck": "node scripts/typecheck.mjs",
+    "typecheck": "tsc --noEmit",
     "test:ui": "playwright test",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

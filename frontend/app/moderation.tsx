@@ -120,7 +120,7 @@ const [offset, setOffset] = usePageState('reports-offset', 0);
               </div>
               
               <div className="moderation-actions">
-                {['review', 'dismiss', 'escalate', 'resolve', ...(!r.deleted_at && r.post_id ? [r.hidden ? 'unhide' : 'hide'] : []), ...(user.role === 'admin' && r.post_id ? [...(!r.deleted_at ? ['delete'] : []), 'suspend', 'unsuspend'] : [])].map(a => (
+                {['review', 'dismiss', ...(user.role === 'moderator' ? ['escalate'] : []), 'resolve', ...(!r.deleted_at && r.post_id ? [r.hidden ? 'unhide' : 'hide'] : []), ...(user.role === 'admin' && r.post_id ? [...(!r.deleted_at ? ['delete'] : []), 'suspend', 'unsuspend'] : [])].map(a => (
                   <button className="moderation-action-btn" data-action={a} key={a} onClick={() => choose(r, a)}>
                     {({ review: 'Under review', dismiss: 'Dismiss', escalate: 'Escalate to Admin', resolve: 'Resolve', hide: 'Hide story', unhide: 'Unhide story', delete: 'Delete story', suspend: 'Suspend author', unsuspend: 'Unsuspend author' } as Record<string, string>)[a]}
                   </button>
